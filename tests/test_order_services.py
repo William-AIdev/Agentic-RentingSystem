@@ -1,0 +1,344 @@
+from datetime import datetime, timedelta
+import os
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+import sys
+import uuid
+
+import pytest
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Ensure repo root is importable when running pytest directly.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from services import order_services as svc
+from services.types import (
+    NotFoundError,
+    OrderStatus,
+    TerminalOrderError,
+    ValidationError,
+)
+
+
+USE_REAL_DB = os.getenv("USE_REAL_DB") == "1"
+
+
+@pytest.fixture()
+def client_and_cleanup():
+    if USE_REAL_DB:
+        client = svc._create_client()
+        created: List[str] = []
+        yield client, created
+        for order_id in created:
+            try:
+                svc.cancel_order(order_id, client=client, hard_delete=True)
+            except Exception:
+                pass
+    else:
+        client = FakeClient()
+        created: List[str] = []
+        yield client, created
+
+
+def _new_order_id(prefix: str, created: List[str]) -> str:
+    order_id = f"{prefix}-{uuid.uuid4().hex[:8]}"
+    created.append(order_id)
+    return order_id
+
+
+def _new_sku(prefix: str) -> str:
+    return f"{prefix}-{uuid.uuid4().hex[:6]}"
+
+
+class _Resp:
+    def __init__(self, data: Optional[List[Dict[str, Any]]]) -> None:
+        self.data = data
+
+
+class _TableStub:
+    """
+    Minimal supabase table stub to keep tests in-memory and side-effect free.
+    Supports select/insert/update/delete/eq/limit/execute chaining.
+    """
+
+    def __init__(self, storage: Dict[str, Dict[str, Any]]) -> None:
+        self.storage = storage
+        self._filters: Dict[str, Any] = {}
+        self._limit: Optional[int] = None
+        self._op: Optional[str] = None
+        self._payload: Optional[Dict[str, Any]] = None
+
+    def select(self, _cols: str) -> "_TableStub":
+        self._op = "select"
+        return self
+
+    def insert(self, payload: Dict[str, Any]) -> "_TableStub":
+        self._op = "insert"
+        self._payload = payload
+        return self
+
+    def update(self, payload: Dict[str, Any]) -> "_TableStub":
+        self._op = "update"
+        self._payload = payload
+        return self
+
+    def delete(self) -> "_TableStub":
+        self._op = "delete"
+        return self
+
+    def eq(self, key: str, value: Any) -> "_TableStub":
+        self._filters[key] = value
+        return self
+
+    def limit(self, n: int) -> "_TableStub":
+        self._limit = n
+        return self
+
+    def execute(self) -> _Resp:
+        if self._op == "insert":
+            assert self._payload is not None
+            row = {**self._payload}
+            now_iso = datetime.now().isoformat()
+            row.setdefault("created_at", now_iso)
+            row.setdefault("updated_at", now_iso)
+            if row["order_id"] in self.storage:
+                return _Resp(data=None)
+            self.storage[row["order_id"]] = row
+            return _Resp(data=[row])
+
+        if self._op == "select":
+            rows = list(self.storage.values())
+            for k, v in self._filters.items():
+                rows = [r for r in rows if r.get(k) == v]
+            if self._limit is not None:
+                rows = rows[: self._limit]
+            return _Resp(data=rows)
+
+        if self._op == "update":
+            assert self._payload is not None
+            rows = [r for r in self.storage.values() if all(r.get(k) == v for k, v in self._filters.items())]
+            if not rows:
+                return _Resp(data=None)
+            for row in rows:
+                row.update(self._payload)
+                row["updated_at"] = datetime.now().isoformat()
+            return _Resp(data=rows)
+
+        if self._op == "delete":
+            rows = []
+            for oid, row in list(self.storage.items()):
+                if all(row.get(k) == v for k, v in self._filters.items()):
+                    rows.append(self.storage.pop(oid))
+            return _Resp(data=rows or None)
+
+        raise RuntimeError("Unsupported operation")
+
+
+class FakeClient:
+    """Supabase client stub with an in-memory table map."""
+
+    def __init__(self) -> None:
+        self._storage: Dict[str, Dict[str, Any]] = {}
+
+    def table(self, _name: str) -> _TableStub:
+        return _TableStub(self._storage)
+
+
+def _sample_times() -> Tuple[datetime, datetime]:
+    start = datetime.now().replace(microsecond=0)
+    return start, start + timedelta(hours=2)
+
+
+def test_add_and_get_order_roundtrip(client_and_cleanup):
+    client, created_ids = client_and_cleanup
+    start, end = _sample_times()
+    sku = _new_sku("SKU")
+    order_id = _new_order_id("O", created_ids)
+    created_order = svc.add_order_to_db(
+        order_id=order_id,
+        user_name="Alice",
+        user_wechat="wx_alice",
+        sku=sku,
+        start_at=start,
+        end_at=end,
+        client=client,
+    )
+    fetched = svc.get_order_detail(order_id, client=client)
+    assert created_order.order_id == order_id
+    assert fetched.order_id == order_id
+    assert fetched.status == OrderStatus.RESERVED.value
+    assert fetched.buffer_hours == svc.DEFAULT_BUFFER_HOURS
+    assert fetched.start_at == start
+    assert fetched.end_at == end
+
+
+def test_add_order_invalid_time_raises(client_and_cleanup):
+    client, created_ids = client_and_cleanup
+    start = datetime.now()
+    sku = _new_sku("SKU")
+    order_id = _new_order_id("O", created_ids)
+    with pytest.raises(ValidationError):
+        svc.add_order_to_db(
+            order_id=order_id,
+            user_name="Bob",
+            user_wechat="wx_bob",
+            sku=sku,
+            start_at=start,
+            end_at=start - timedelta(hours=1),
+            client=client,
+        )
+
+
+def test_edit_order_updates_time_and_fields(client_and_cleanup):
+    client, created_ids = client_and_cleanup
+    start, end = _sample_times()
+    sku = _new_sku("SKU")
+    order_id = _new_order_id("O", created_ids)
+    svc.add_order_to_db(
+        order_id=order_id,
+        user_name="C",
+        user_wechat="wx_c",
+        sku=sku,
+        start_at=start,
+        end_at=end,
+        client=client,
+    )
+    new_start = start + timedelta(days=1)
+    new_end = new_start + timedelta(hours=3)
+    updated = svc.edit_order_from_db(
+        order_id,
+        patch={"start_at": new_start, "end_at": new_end, "status": OrderStatus.PAID.value},
+        client=client,
+    )
+    assert updated.start_at == new_start
+    assert updated.end_at == new_end
+    assert updated.status == OrderStatus.PAID.value
+
+
+def test_terminal_order_rejects_edits(client_and_cleanup):
+    client, created_ids = client_and_cleanup
+    start, end = _sample_times()
+    sku = _new_sku("SKU")
+    order_id = _new_order_id("O", created_ids)
+    svc.add_order_to_db(
+        order_id=order_id,
+        user_name="D",
+        user_wechat="wx_d",
+        sku=sku,
+        start_at=start,
+        end_at=end,
+        client=client,
+    )
+    svc.finish_order(order_id, client=client)
+    with pytest.raises(TerminalOrderError):
+        svc.edit_order_from_db(order_id, patch={"status": OrderStatus.PAID.value}, client=client)
+
+
+def test_cancel_soft_and_hard_delete(client_and_cleanup):
+    client, created_ids = client_and_cleanup
+    start, end = _sample_times()
+    sku1 = _new_sku("SKU")
+    order_id1 = _new_order_id("O", created_ids)
+    svc.add_order_to_db(
+        order_id=order_id1,
+        user_name="E",
+        user_wechat="wx_e",
+        sku=sku1,
+        start_at=start,
+        end_at=end,
+        client=client,
+    )
+    soft = svc.cancel_order(order_id1, client=client)
+    assert soft.status == OrderStatus.CANCELED.value
+
+    sku2 = _new_sku("SKU")
+    order_id2 = _new_order_id("O", created_ids)
+    svc.add_order_to_db(
+        order_id=order_id2,
+        user_name="F",
+        user_wechat="wx_f",
+        sku=sku2,
+        start_at=start,
+        end_at=end,
+        client=client,
+    )
+    deleted = svc.cancel_order(order_id2, client=client, hard_delete=True)
+    assert deleted.order_id == order_id2
+    with pytest.raises(NotFoundError):
+        svc.get_order_detail(order_id2, client=client)
+
+
+def test_mark_paid_and_deliver_and_finish(client_and_cleanup):
+    client, created_ids = client_and_cleanup
+    start, end = _sample_times()
+    sku = _new_sku("SKU")
+    order_id = _new_order_id("O", created_ids)
+    svc.add_order_to_db(
+        order_id=order_id,
+        user_name="G",
+        user_wechat="wx_g",
+        sku=sku,
+        start_at=start,
+        end_at=end,
+        client=client,
+    )
+
+    paid = svc.mark_order_paid(order_id, client=client)
+    assert paid.status == OrderStatus.PAID.value
+
+    with pytest.raises(ValidationError):
+        svc.deliver_order(order_id, locker_code="", client=client)
+
+    shipped = svc.deliver_order(order_id, locker_code="LC123", client=client)
+    assert shipped.status == OrderStatus.SHIPPED.value
+    assert shipped.locker_code == "LC123"
+
+    finished = svc.finish_order(order_id, client=client)
+    assert finished.status == OrderStatus.SUCCESSFUL.value
+
+
+def test_suggest_time_slots_text(client_and_cleanup):
+    client, created_ids = client_and_cleanup
+    expected_start = datetime(2025, 1, 10, 10, 0, 0)
+    expected_end = datetime(2025, 1, 10, 12, 0, 0)
+    sku = _new_sku("SKU-S")
+
+    svc.add_order_to_db(
+        order_id=_new_order_id("S", created_ids),
+        user_name="A",
+        user_wechat="wx_a",
+        sku=sku,
+        start_at=datetime(2025, 1, 5, 9, 0, 0),
+        end_at=datetime(2025, 1, 5, 11, 0, 0),
+        buffer_hours=1,
+        client=client,
+    )
+    svc.add_order_to_db(
+        order_id=_new_order_id("S", created_ids),
+        user_name="B",
+        user_wechat="wx_b",
+        sku=sku,
+        start_at=datetime(2025, 1, 12, 10, 0, 0),
+        end_at=datetime(2025, 1, 12, 13, 0, 0),
+        buffer_hours=0,
+        client=client,
+    )
+
+    text = svc.suggest_time_slots_text(
+        sku=sku,
+        expected_start_at=expected_start,
+        expected_end_at=expected_end,
+        client=client,
+    )
+
+    window_start = (expected_start - timedelta(days=7)).isoformat()
+    window_end = (expected_end + timedelta(days=7)).isoformat()
+    assert f"SKU {sku} 可供选择的时间段（{window_start} 至 {window_end}）" in text
+    assert "2025-01-03T10:00:00 到 2025-01-05T08:00:00" in text
+    assert "2025-01-05T12:00:00 到 2025-01-12T10:00:00" in text
+    assert "2025-01-12T13:00:00 到 2025-01-17T12:00:00" in text
