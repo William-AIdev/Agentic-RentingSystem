@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
@@ -23,11 +23,14 @@ from services.types import (
 
 load_dotenv()
 
+# Default timezone for internal datetime handling in this module.
+UTC_TZ: tzinfo = timezone.utc
+
 # if not specified in DB
 DEFAULT_BUFFER_HOURS = 3
 
 
-def _create_client() -> Client:
+def create_db_client() -> Client:
     """
     Create a supabase client using the service role key when present.
     Returns: supabase Client configured for server-side use.
@@ -43,16 +46,25 @@ def _create_client() -> Client:
     )
 
 
-def _dt_to_iso(dt: datetime) -> str:
-    """Input: datetime. Returns ISO string for DB writes."""
-    return dt.isoformat()
+def _to_utc(dt: datetime) -> datetime:
+    """Ensure datetime is timezone-aware and normalized to UTC."""
+    if dt.tzinfo is None:
+        # Default naive datetimes to UTC for internal logic.
+        return dt.replace(tzinfo=UTC_TZ)
+    return dt.astimezone(UTC_TZ)
 
 
-def _parse_dt(value: datetime | str) -> datetime:
-    """Accept datetime or ISO string and return datetime."""
+def _dt_to_iso_utc(dt: datetime) -> str:
+    """Input: datetime. Returns ISO string for DB writes in UTC."""
+    return _to_utc(dt).isoformat()
+
+
+def _iso_to_dt_utc(value: datetime | str) -> datetime:
+    """Accept datetime or ISO string and return UTC datetime."""
     if isinstance(value, datetime):
-        return value
-    return datetime.fromisoformat(value)
+        return _to_utc(value)
+    parsed = datetime.fromisoformat(value)
+    return _to_utc(parsed)
 
 
 def _data_to_order(row: Dict[str, Any]) -> Order:
@@ -62,19 +74,19 @@ def _data_to_order(row: Dict[str, Any]) -> Order:
         user_name=row["user_name"],
         user_wechat=row["user_wechat"],
         sku=row["sku"],
-        start_at=_parse_dt(row["start_at"]),
-        end_at=_parse_dt(row["end_at"]),
+        start_at_iso=_iso_to_dt_utc(row["start_at"]),
+        end_at_iso=_iso_to_dt_utc(row["end_at"]),
         buffer_hours=int(row.get("buffer_hours") or 0),
         status=row["status"],
         locker_code=row.get("locker_code"),
-        created_at=_parse_dt(row["created_at"]),
-        updated_at=_parse_dt(row["updated_at"]),
+        created_at=_iso_to_dt_utc(row["created_at"]),
+        updated_at=_iso_to_dt_utc(row["updated_at"]),
     )
 
 
 def _get_data_from_db(order_id: str, client: Optional[Client] = None) -> Dict[str, Any]:
     """Fetch raw row dict by order_id; empty dict if not found."""
-    sb = client or _create_client()
+    sb = client or create_db_client()
     resp = sb.table("orders").select("*").eq("order_id", order_id).limit(1).execute()
     data = getattr(resp, "data", None)
     if data:
@@ -85,7 +97,7 @@ def _get_data_from_db(order_id: str, client: Optional[Client] = None) -> Dict[st
 def _validate_time_range(start_at: datetime, end_at: datetime) -> None:
     """Ensure start < end; raise ValidationError otherwise."""
     if start_at >= end_at:
-        raise ValidationError("start_at must be earlier than end_at")
+        raise ValidationError("start_at_iso must be earlier than end_at_iso")
 
 
 def _merge_time_ranges(ranges: list[TimeRange]) -> list[TimeRange]:
@@ -125,23 +137,24 @@ def suggest_time_slots_text(  # todo: could have better suggestion logic
 ) -> str:
     """
     Suggest available rental time slots within +/- window_days around expected time.
+    User input without tzinfo is treated as UTC.
     Returns: human-readable text with available slots.
     """
-    expected_start = _parse_dt(expected_start_at)
+    expected_start = _iso_to_dt_utc(expected_start_at)
     if expected_end_at is None:
-        expected_end = expected_start + timedelta(hours=3) # default 3-hour renting slot
+        expected_end = expected_start + timedelta(hours=3)  # default 3-hour renting slot
     else:
-        expected_end = _parse_dt(expected_end_at)
+        expected_end = _iso_to_dt_utc(expected_end_at)
         _validate_time_range(expected_start, expected_end)
 
     # earliest is now
     window_start = expected_start - timedelta(days=window_days)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(tz=UTC_TZ)
     if window_start < now:
         window_start = now
     window_end = expected_end + timedelta(days=window_days)
 
-    sb = client or _create_client()
+    sb = client or create_db_client()
     resp = sb.table("orders").select("*").eq("sku", sku).execute()
     rows = getattr(resp, "data", None) or []
 
@@ -149,8 +162,8 @@ def suggest_time_slots_text(  # todo: could have better suggestion logic
     for row in rows:
         if row.get("status") not in OCCUPYING_STATUSES:
             continue
-        start_at = _parse_dt(row["start_at"])
-        end_at = _parse_dt(row["end_at"])
+        start_at = _iso_to_dt_utc(row["start_at"])
+        end_at = _iso_to_dt_utc(row["end_at"])
         buffer_hours = int(row.get("buffer_hours") or 0)
         if buffer_hours:
             start_at -= timedelta(hours=buffer_hours)
@@ -159,7 +172,7 @@ def suggest_time_slots_text(  # todo: could have better suggestion logic
             continue
         occupied.append(TimeRange(start_at=start_at, end_at=end_at))
 
-    occupied.sort(key=lambda r: r.start_at)
+    occupied.sort(key=lambda r: r.start_at_iso)
     merged = _merge_time_ranges(occupied)
 
     free_slots: list[TimeRange] = []
@@ -189,18 +202,22 @@ def add_order_to_db(
 ) -> Order:
     """
     Insert a new order row to DB (default status is RESERVED).
+    User input without tzinfo is treated as UTC.
     Inputs: basic order fields + optional locker_code/buffer_hours.
     Returns: created Order.
     """
-    _validate_time_range(start_at, end_at)
-    sb = client or _create_client()
+    start_at_utc = _iso_to_dt_utc(start_at)
+    end_at_utc = _iso_to_dt_utc(end_at)
+    _validate_time_range(start_at_utc, end_at_utc)
+    sb = client or create_db_client()
+    sku = sku.strip().upper()
     payload = {
         "order_id": order_id,
         "user_name": user_name,
         "user_wechat": user_wechat,
         "sku": sku,
-        "start_at": _dt_to_iso(start_at),
-        "end_at": _dt_to_iso(end_at),
+        "start_at": _dt_to_iso_utc(start_at_utc),
+        "end_at": _dt_to_iso_utc(end_at_utc),
         "status": status,
         "buffer_hours": buffer_hours if buffer_hours is not None else DEFAULT_BUFFER_HOURS,
     }
@@ -230,7 +247,7 @@ def edit_order_from_db(
     """
     if not patch:
         raise ValidationError("Patch cannot be empty")
-    sb = client or _create_client()
+    sb = client or create_db_client()
     existing = _get_data_from_db(order_id, sb)
     if not existing:
         raise NotFoundError(f"Order {order_id} not found")
@@ -238,11 +255,11 @@ def edit_order_from_db(
         raise TerminalOrderError(f"Order {order_id} is terminal and cannot be modified")
 
     if "start_at" in patch or "end_at" in patch:
-        new_start = _parse_dt(patch.get("start_at", existing["start_at"]))
-        new_end = _parse_dt(patch.get("end_at", existing["end_at"]))
+        new_start = _iso_to_dt_utc(patch.get("start_at", existing["start_at"]))
+        new_end = _iso_to_dt_utc(patch.get("end_at", existing["end_at"]))
         _validate_time_range(new_start, new_end)
-        patch["start_at"] = _dt_to_iso(new_start)
-        patch["end_at"] = _dt_to_iso(new_end)
+        patch["start_at"] = _dt_to_iso_utc(new_start)
+        patch["end_at"] = _dt_to_iso_utc(new_end)
 
     for key in ("created_at", "updated_at"):
         patch.pop(key, None)
@@ -266,7 +283,7 @@ def cancel_order(order_id: str, *, client: Optional[Client] = None, hard_delete:
     Cancel an order (default: soft cancel via status). Set hard_delete=True to remove the row.
     Returns: canceled or deleted Order.
     """
-    sb = client or _create_client()
+    sb = client or create_db_client()
     if hard_delete:
         resp = sb.table("orders").delete().eq("order_id", order_id).execute()
         data = getattr(resp, "data", None) or []
@@ -317,8 +334,8 @@ def order_to_text(order: Order) -> str:
         f"User Name: {order.user_name}",
         f"WeChat: {order.user_wechat}",
         f"SKU: {order.sku}",
-        f"Start At: {order.start_at.isoformat()}",
-        f"End At: {order.end_at.isoformat()}",
+        f"Start At: {order.start_at_iso.isoformat()}",
+        f"End At: {order.end_at_iso.isoformat()}",
         f"Buffer Hours: {order.buffer_hours}",
         f"Status: {order.status}",
         f"Locker Code: {order.locker_code or 'N/A'}",

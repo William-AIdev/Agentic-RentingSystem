@@ -25,10 +25,10 @@ def main():
     now_iso = datetime.now(TZ_SYDNEY).isoformat()
 
     # occupied 是 tstzrange 列；用 PostgREST 的 range 操作在 SDK 里不总是直观。
-    # MVP 最简单：把过滤范围缩小到同 sku + 占用状态，再在 Python 里判断 now 是否在 [start_at, end_at+3h)。
+    # MVP 最简单：把过滤范围缩小到同 sku + 占用状态，再在 Python 里判断 now 是否在 [start_at_iso, end_at_iso+3h)。
     rows = (
         sb.table("orders")
-        .select("order_id, start_at, end_at, buffer_hours, status")
+        .select("order_id, start_at_iso, end_at_iso, buffer_hours, status")
         .eq("sku", sku)
         .in_("status", OCCUPYING_STATUSES)
         .execute()

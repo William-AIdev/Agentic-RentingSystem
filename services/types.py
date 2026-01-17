@@ -35,8 +35,8 @@ class Order:
     user_name: str
     user_wechat: str
     sku: str
-    start_at: datetime
-    end_at: datetime
+    start_at_iso: datetime
+    end_at_iso: datetime
     buffer_hours: int
     status: str
     locker_code: Optional[str]
@@ -53,8 +53,8 @@ class TimeRange:
 # @dataclass(frozen=True)
 # class Suggestion:
 #     """Suggested alternative time slot for a request that conflicts."""
-#     start_at: datetime
-#     end_at: datetime
+#     start_at_iso: datetime
+#     end_at_iso: datetime
 
 
 # =========
