@@ -209,45 +209,57 @@ def test_mark_paid_and_deliver_and_finish(client_and_cleanup):
 
 def test_suggest_time_slots_text(client_and_cleanup):
     client, created_ids = client_and_cleanup
-    expected_start = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=30)
-    expected_end = expected_start + timedelta(hours=2)
     sku = "white_s"
+    window_days = 5
+
+    base_now = datetime.now(timezone.utc).replace(microsecond=0)
+
+    # Expected rental time: 2 hours after now, for 3 hours.
+    expected_start = base_now + timedelta(hours=2)
+    expected_end = expected_start + timedelta(hours=3)
+
+    # Create two reservations that, with default 3h buffer so only 1 hour available between
+    res_expected_start = expected_start + timedelta(hours=1)
+    res_expected_end = res_expected_start + timedelta(hours=4)
+    res_expected_start_2 = res_expected_end + timedelta(hours=4)
+    res_expected_end_2 = res_expected_start_2 + timedelta(hours=2)
 
     svc.add_order_to_db(
         order_id=_new_order_id(created_ids),
         user_name="A",
         user_wechat="wx_a",
         sku=sku,
-        start_at=expected_start - timedelta(days=7),
-        end_at=expected_start - timedelta(days=7) + timedelta(hours=2),
+        start_at=res_expected_start,
+        end_at=res_expected_end,
         client=client,
     )
+
     svc.add_order_to_db(
         order_id=_new_order_id(created_ids),
         user_name="B",
         user_wechat="wx_b",
         sku=sku,
-        start_at=expected_start + timedelta(days=2),
-        end_at=expected_start + timedelta(days=2, hours=3),
+        start_at=res_expected_start_2,
+        end_at=res_expected_end_2,
         client=client,
     )
 
-    text = svc.suggest_time_slots_text(
+    # Ask for suggestions around the expected window.
+    suggest_text = svc.suggest_time_slots_text(
         sku=sku,
         expected_start_at=expected_start,
         expected_end_at=expected_end,
         client=client,
+        window_days=window_days,
     )
 
-    expected_start_utc = _naive_to_utc(expected_start)
-    expected_end_utc = _naive_to_utc(expected_end)
-    window_start = (expected_start_utc - timedelta(days=3)).isoformat()
-    window_end = (expected_end_utc + timedelta(days=3)).isoformat()
-    block_start = (_naive_to_utc(expected_start + timedelta(days=2))
-                   - timedelta(hours=svc.DEFAULT_BUFFER_HOURS)).isoformat()
-    block_end = (_naive_to_utc(expected_start + timedelta(days=2, hours=3))
-                 + timedelta(hours=svc.DEFAULT_BUFFER_HOURS)).isoformat()
-    pass
-    # assert f"SKU {sku} 可供选择的时间段（{window_start} 至 {window_end}）" in text
-    # assert f"{window_start} 到 {block_start}" in text
-    # assert f"{block_end} 到 {window_end}" in text
+    # Window is expected_start - X days to expected_end + X days.
+    window_start = (expected_start - timedelta(days=window_days)).isoformat()
+    window_end = (expected_end + timedelta(days=window_days)).isoformat()
+    # Two reservations + buffer merge into a single blocked span at the window's start.
+    block_start = (res_expected_start - timedelta(hours=svc.DEFAULT_BUFFER_HOURS)).isoformat()
+    block_end = (res_expected_end_2 + timedelta(hours=svc.DEFAULT_BUFFER_HOURS)).isoformat()
+
+    # Only slots long enough to cover the 6-day duration should be listed.
+    assert f"{block_end} 到 {window_end}" in suggest_text
+    assert f"{window_start} 到 {block_start}" not in suggest_text

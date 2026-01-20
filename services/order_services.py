@@ -115,6 +115,7 @@ def _merge_time_ranges(ranges: list[TimeRange]) -> list[TimeRange]:
 
 
 def _format_slots_text(sku: str, window_start: datetime, window_end: datetime, slots: list[TimeRange]) -> str:
+    sku = sku.strip().upper()
     if not slots:
         return (
             f"SKU {sku} 在 {window_start.isoformat()} 到 {window_end.isoformat()} 内无可供选择的时间段。"
@@ -127,7 +128,7 @@ def _format_slots_text(sku: str, window_start: datetime, window_end: datetime, s
     return "\n".join(lines)
 
 
-def suggest_time_slots_text(  # todo: could have better suggestion logic
+def suggest_time_slots_text(
         *,
         sku: str,
         expected_start_at: datetime | str,
@@ -140,6 +141,7 @@ def suggest_time_slots_text(  # todo: could have better suggestion logic
     User input without tzinfo is treated as UTC.
     Returns: human-readable text with available slots.
     """
+    sku = sku.strip().upper()
     expected_start = _iso_to_dt_utc(expected_start_at)
     if expected_end_at is None:
         expected_end = expected_start + timedelta(hours=3)  # default 3-hour renting slot
@@ -147,12 +149,18 @@ def suggest_time_slots_text(  # todo: could have better suggestion logic
         expected_end = _iso_to_dt_utc(expected_end_at)
         _validate_time_range(expected_start, expected_end)
 
-    # earliest is now
+    # Clamp window days to [0, 7].
+    window_days = max(0, min(7, window_days))
+    duration = expected_end - expected_start
+
+    # Earliest start is now; window range is expected_start - X to expected_end + X.
     window_start = expected_start - timedelta(days=window_days)
     now = datetime.now(tz=UTC_TZ)
     if window_start < now:
         window_start = now
     window_end = expected_end + timedelta(days=window_days)
+    if window_end <= window_start:
+        return _format_slots_text(sku, window_start, window_end, [])
 
     sb = client or create_db_client()
     resp = sb.table("orders").select("*").eq("sku", sku).execute()
@@ -172,7 +180,7 @@ def suggest_time_slots_text(  # todo: could have better suggestion logic
             continue
         occupied.append(TimeRange(start_at=start_at, end_at=end_at))
 
-    occupied.sort(key=lambda r: r.start_at_iso)
+    occupied.sort(key=lambda r: r.start_at)
     merged = _merge_time_ranges(occupied)
 
     free_slots: list[TimeRange] = []
@@ -184,7 +192,12 @@ def suggest_time_slots_text(  # todo: could have better suggestion logic
     if cursor < window_end:
         free_slots.append(TimeRange(start_at=cursor, end_at=window_end))
 
-    return _format_slots_text(sku, window_start, window_end, free_slots)
+    # Only keep slots that can fit the requested duration.
+    filtered_slots = [
+        slot for slot in free_slots if (slot.end_at - slot.start_at) >= duration
+    ]
+
+    return _format_slots_text(sku, window_start, window_end, filtered_slots)
 
 
 def add_order_to_db(
@@ -260,6 +273,8 @@ def edit_order_from_db(
         _validate_time_range(new_start, new_end)
         patch["start_at"] = _dt_to_iso_utc(new_start)
         patch["end_at"] = _dt_to_iso_utc(new_end)
+    if "sku" in patch and patch["sku"] is not None:
+        patch["sku"] = str(patch["sku"]).strip().upper()
 
     for key in ("created_at", "updated_at"):
         patch.pop(key, None)
