@@ -1,0 +1,18 @@
+python-dotenv>=1.0.0
+psycopg[binary,pool]>=3.1.18
+
+# Gradio UI
+gradio>=4.44.0
+
+# LangChain + LangGraph
+langchain>=0.2.16
+langchain-core>=0.2.38
+langchain-community>=0.2.15
+langchain-openai>=0.2.8
+langchain-text-splitters>=0.2.2
+langgraph>=0.2.35
+
+# Vector store + embeddings
+langchain-qdrant>=0.1.4
+qdrant-client>=1.11.1
+sentence-transformers>=3.0.1
