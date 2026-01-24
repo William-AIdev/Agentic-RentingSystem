@@ -60,7 +60,7 @@ def build_ui() -> gr.Blocks:
     with gr.Blocks(title=settings.app_title) as demo:
         gr.Markdown("""# Rental Agent - 基于 LangGraph 的订单/规则助手。""")
         browser_state = gr.BrowserState(storage_key="rental_thread_id")
-        chatbot = gr.Chatbot(label="对话", type="messages")
+        chatbot = gr.Chatbot(label="对话")
         msg = gr.Textbox(label="输入", placeholder="输入问题或订单指令")
         send = gr.Button("发送")
         new_chat = gr.Button("新对话")
@@ -76,7 +76,12 @@ def build_ui() -> gr.Blocks:
 def main() -> None:
     ui = build_ui()
     ui.queue()
-    ui.launch(server_name=settings.app_host, server_port=settings.app_port)
+    ui.launch(server_name=settings.app_host,
+              server_port=settings.app_port,
+              debug=True,
+              show_error=True,
+              theme=gr.themes.Citrus()
+              )
 
 
 if __name__ == "__main__":

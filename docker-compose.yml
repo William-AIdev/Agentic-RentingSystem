@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    image: postgres:17
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -9,10 +9,10 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./db/init:/docker-entrypoint-initdb.d:ro
 
   qdrant:
-    image: qdrant/qdrant:v1.12.0
+    image: qdrant/qdrant:v1.16.0
     ports:
       - "6333:6333"
     volumes:
@@ -26,6 +26,22 @@ services:
       - qdrant
     ports:
       - "7860:7860"
+    # command: ["python", "-m", "app.main"]
+
+    # for development with auto-reload
+    command:
+      [
+        "watchfiles",
+        "python -m app.main",
+        "/app/agent",
+        "/app/app",
+        "/app/services",
+        "/app/Dockerfile",
+        "/app/docker-compose.yml",
+        "/app/requirements.txt",
+      ]
+    volumes:
+      - ./:/app # for development
 
 volumes:
   pgdata:

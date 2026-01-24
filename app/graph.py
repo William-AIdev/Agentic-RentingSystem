@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict
 
 from langchain.chat_models import init_chat_model
@@ -18,6 +19,17 @@ SYSTEM_PROMPT = (
     "- 用户创建/更新/取消/查询订单等操作时，必须调用相应订单工具。\n"
     "- 如果缺少必要字段（例如订单号、时间、SKU 等），先追问补齐。"
 )
+
+
+def _configure_langsmith_tracing() -> None:
+    if not os.getenv("LANGSMITH_API_KEY"):
+        return
+    os.environ.setdefault("LANGSMITH_TRACING", "true")
+    os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+    os.environ.setdefault("LANGSMITH_PROJECT", os.getenv("LANGSMITH_PROJECT", "rental-agent"))
+
+
+_configure_langsmith_tracing()
 
 
 llm = init_chat_model(
