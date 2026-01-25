@@ -210,4 +210,3 @@ __marimo__/
 .env.*.local
 .env.local
 .env
-/supabase/

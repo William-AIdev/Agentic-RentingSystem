@@ -3,11 +3,13 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 import hashlib
+import threading
 from typing import List, Optional
 
 from langchain_community.embeddings import HuggingFaceBgeEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
+from qdrant_client.http import models as qdrant_models
 from langchain_text_splitters import MarkdownHeaderTextSplitter
 
 from app.config import settings
@@ -29,6 +31,7 @@ class RulesRAG:
         self._vectorstore: Optional[QdrantVectorStore] = None
         self._initialized = False
         self._error: Optional[str] = None
+        self._ready = threading.Event()
 
     def _read_rules_text(self, path: Path) -> str:
         if not path.exists():
@@ -65,15 +68,18 @@ class RulesRAG:
             rules_text = self._read_rules_text(rules_path)
             if not rules_text:
                 self._error = "规则文件为空或不存在。"
+                self._ready.set()
                 return
 
-            # Use content hash to version collections and skip rebuilds when rules are unchanged.
+            # Use content hash to version collections and only switch alias after rebuild completes.
             rules_md5 = hashlib.md5(rules_text.encode("utf-8")).hexdigest()
             base_collection = settings.qdrant_collection
-            collection_name = f"{base_collection}_{rules_md5}"
+            target_collection = f"{base_collection}_{rules_md5}"
 
             client = QdrantClient(url=settings.qdrant_url)
             existing = {c.name for c in client.get_collections().collections}
+            # Map alias -> collection for atomic cutover after rebuild.
+            aliases = {a.alias_name: a.collection_name for a in client.get_aliases().aliases}
 
             embeddings = HuggingFaceBgeEmbeddings(
                 model_name=settings.embedding_model,
@@ -82,36 +88,69 @@ class RulesRAG:
                 query_instruction="",
             )
 
-            # Reuse the existing collection for this rules hash to avoid recomputing vectors.
-            if collection_name in existing and not settings.rag_recreate:
+            # Reuse when alias already points to the correct rules hash collection.
+            if (
+                not settings.rag_recreate
+                and aliases.get(base_collection) == target_collection
+                and target_collection in existing
+            ):
                 self._vectorstore = QdrantVectorStore(
                     client=client,
-                    collection_name=collection_name,
+                    collection_name=base_collection,
                     embedding=embeddings,
                 )
+                self._ready.set()
                 return
 
             docs = self._split_rule_text(rules_text)
             if not docs:
                 self._error = "规则文件为空或不存在。"
+                self._ready.set()
                 return
 
-            # Build a fresh collection for the current rules content.
+            # Build the target collection first; switch alias only after success.
             self._vectorstore = QdrantVectorStore.from_texts(
                 texts=docs,
                 embedding=embeddings,
                 url=settings.qdrant_url,
-                collection_name=collection_name,
+                collection_name=target_collection,
                 force_recreate=True,
+            )
+
+            # Switch alias only after the new collection is fully built.
+            alias_ops = []
+            if base_collection in aliases:
+                alias_ops.append(
+                    qdrant_models.DeleteAliasOperation(
+                        delete_alias=qdrant_models.DeleteAlias(alias_name=base_collection)
+                    )
+                )
+            alias_ops.append(
+                qdrant_models.CreateAliasOperation(
+                    create_alias=qdrant_models.CreateAlias(
+                        collection_name=target_collection,
+                        alias_name=base_collection,
+                    )
+                )
+            )
+            client.update_collection_aliases(alias_ops)
+
+            # Query through alias to avoid ever touching a half-built collection.
+            self._vectorstore = QdrantVectorStore(
+                client=client,
+                collection_name=base_collection,
+                embedding=embeddings,
             )
 
             # Remove older rule collections to keep storage tidy.
             for name in existing:
-                if name != collection_name and name.startswith(f"{base_collection}_"):
+                if name != target_collection and name.startswith(f"{base_collection}_"):
                     client.delete_collection(name)
+            self._ready.set()
         except Exception as exc:  # pragma: no cover - defensive
             self._error = str(exc)
             logger.exception("Failed to initialize RAG index")
+            self._ready.set()
 
     def query(self, question: str, k: Optional[int] = None) -> List[str]:
         self._init_vectorstore()
@@ -125,6 +164,10 @@ class RulesRAG:
     def error(self) -> Optional[str]:
         self._init_vectorstore()
         return self._error
+
+    @property
+    def ready(self) -> bool:
+        return self._ready.is_set()
 
 
 rules_rag = RulesRAG()

@@ -166,7 +166,10 @@ def suggest_time_slots_tool(
 
 @tool
 def rag_rules_tool(*, question: str) -> Dict[str, Any]:
-    """基于本地规则文件回答客户的规则/流程/计费/押金等问题。"""
+    """基于本地规则文件回答客户的规则/流程/计费/押金等问题。如果返回了正在初始化，则直接回复让客户稍后再试。
+    若之前因为未初始化而回答失败，而客户再次尝试询问，则你需要再次尝试调用该工具"""
+    if not rules_rag.ready:
+        return {"result": "规则库正在初始化，请稍后再试。"}
     snippets = rules_rag.query(question)
     if not snippets:
         error = rules_rag.error

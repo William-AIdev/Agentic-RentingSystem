@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import uuid
 from typing import List, Tuple
 
@@ -75,8 +76,8 @@ def build_ui() -> gr.Blocks:
 
 
 def main() -> None:
-    # Warm up RAG at startup so the first query doesn't pay initialization cost.
-    _ = rules_rag.error
+    # Warm up RAG in background; tools can short-circuit if not ready yet.
+    threading.Thread(target=lambda: rules_rag.error, daemon=True).start()
     ui = build_ui()
     ui.queue()
     ui.launch(server_name=settings.app_host,

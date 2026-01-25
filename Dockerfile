@@ -17,7 +17,11 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY . /app
 
 # Pre-download embedding model for RAG at build time
-RUN python -c "from langchain_community.embeddings import HuggingFaceBgeEmbeddings; from app.config import settings; print('Pre downloading RAG models...'); emb = HuggingFaceBgeEmbeddings(model_name=settings.embedding_model, model_kwargs={'device': 'cpu'}, encode_kwargs={'normalize_embeddings': settings.embedding_normalize}, query_instruction=''); emb.embed_query('warmup')"
+RUN python -c "from langchain_community.embeddings import HuggingFaceBgeEmbeddings;  \
+    from app.config import settings;  \
+    print('Pre downloading RAG models...');  \
+    emb = HuggingFaceBgeEmbeddings(model_name=settings.embedding_model, model_kwargs={'device': 'cpu'}, encode_kwargs={'normalize_embeddings': settings.embedding_normalize}, query_instruction='');  \
+    emb.embed_query('warmup')"
 
 EXPOSE 7860
 
