@@ -9,6 +9,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 from app.config import settings
 from app.graph import app
+from app.rag import rules_rag
 
 
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
@@ -74,6 +75,8 @@ def build_ui() -> gr.Blocks:
 
 
 def main() -> None:
+    # Warm up RAG at startup so the first query doesn't pay initialization cost.
+    _ = rules_rag.error
     ui = build_ui()
     ui.queue()
     ui.launch(server_name=settings.app_host,
