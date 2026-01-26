@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone, tzinfo
 from typing import Any, Dict, Optional
 
-import psycopg
 from psycopg import errors as pg_errors
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session
 
-from services.db import create_db_client, get_conn
+from services.db import create_db_client, get_session
+from services.models import OrderModel
 from services.types import (
     OCCUPYING_STATUSES,
     TERMINAL_STATUSES,
@@ -48,31 +52,35 @@ def _iso_to_dt_utc(value: datetime | str) -> datetime:
     return _to_utc(parsed)
 
 
-def _data_to_order(row: Dict[str, Any]) -> Order:
-    """Convert DB row dict into Order dataclass."""
+def _model_to_order(row: OrderModel) -> Order:
+    """Convert ORM model into Order dataclass."""
     return Order(
-        order_id=row["order_id"],
-        user_name=row["user_name"],
-        user_wechat=row["user_wechat"],
-        sku=row["sku"],
-        start_at_iso=_iso_to_dt_utc(row["start_at"]),
-        end_at_iso=_iso_to_dt_utc(row["end_at"]),
-        buffer_hours=int(row.get("buffer_hours") or 0),
-        status=row["status"],
-        locker_code=row.get("locker_code"),
-        created_at=_iso_to_dt_utc(row["created_at"]),
-        updated_at=_iso_to_dt_utc(row["updated_at"]),
+        order_id=row.order_id,
+        user_name=row.user_name,
+        user_wechat=row.user_wechat,
+        sku=row.sku,
+        start_at_iso=_iso_to_dt_utc(row.start_at),
+        end_at_iso=_iso_to_dt_utc(row.end_at),
+        buffer_hours=int(row.buffer_hours or 0),
+        status=row.status,
+        locker_code=row.locker_code,
+        created_at=_iso_to_dt_utc(row.created_at),
+        updated_at=_iso_to_dt_utc(row.updated_at),
     )
 
 
-def _get_data_from_db(order_id: str, client: Optional[psycopg.Connection] = None) -> Dict[str, Any]:
-    """Fetch raw row dict by order_id; empty dict if not found."""
-    with get_conn(client) as db:
-        row = db.execute(
-            "SELECT * FROM orders WHERE order_id = %s LIMIT 1",
-            (order_id,),
-        ).fetchone()
-        return dict(row) if row else {}
+def _session_tx(session: Session):
+    if session.in_transaction():
+        return nullcontext()
+    return session.begin()
+
+
+def _get_data_from_db(order_id: str, client: Optional[Session] = None) -> Optional[OrderModel]:
+    """Fetch ORM row by order_id; None if not found."""
+    with get_session(client) as session:
+        return session.execute(
+            select(OrderModel).where(OrderModel.order_id == order_id).limit(1)
+        ).scalar_one_or_none()
 
 
 def _validate_time_range(start_at: datetime, end_at: datetime) -> None:
@@ -114,7 +122,7 @@ def suggest_time_slots_text(
     sku: str,
     expected_start_at: datetime | str,
     expected_end_at: datetime | str | None = None,
-    client: Optional[psycopg.Connection] = None,
+    client: Optional[Session] = None,
     window_days: int = 3,
 ) -> str:
     """
@@ -143,20 +151,19 @@ def suggest_time_slots_text(
     if window_end <= window_start:
         return _format_slots_text(sku, window_start, window_end, [])
 
-    with get_conn(client) as db:
-        rows = db.execute(
-            """
-            SELECT * FROM orders
-            WHERE sku = %s AND status = ANY(%s)
-            """,
-            (sku, list(OCCUPYING_STATUSES)),
-        ).fetchall()
+    with get_session(client) as session:
+        rows = session.execute(
+            select(OrderModel).where(
+                OrderModel.sku == sku,
+                OrderModel.status.in_(list(OCCUPYING_STATUSES)),
+            )
+        ).scalars().all()
 
     occupied: list[TimeRange] = []
     for row in rows:
-        start_at = _iso_to_dt_utc(row["start_at"])
-        end_at = _iso_to_dt_utc(row["end_at"])
-        buffer_hours = int(row.get("buffer_hours") or 0)
+        start_at = _iso_to_dt_utc(row.start_at)
+        end_at = _iso_to_dt_utc(row.end_at)
+        buffer_hours = int(row.buffer_hours or 0)
         if buffer_hours:
             start_at -= timedelta(hours=buffer_hours)
             end_at += timedelta(hours=buffer_hours)
@@ -195,7 +202,7 @@ def add_order_to_db(
     status: str = OrderStatus.RESERVED.value,
     buffer_hours: Optional[int] = None,
     locker_code: Optional[str] = None,
-    client: Optional[psycopg.Connection] = None,
+    client: Optional[Session] = None,
 ) -> Order:
     """
     Insert a new order row to DB (default status is RESERVED).
@@ -220,39 +227,32 @@ def add_order_to_db(
         "locker_code": locker_code,
     }
 
-    with get_conn(client) as db:
+    with get_session(client) as session:
+        order = OrderModel(**payload)
         try:
-            row = db.execute(
-                """
-                INSERT INTO orders (
-                    order_id, user_name, user_wechat, sku, start_at, end_at,
-                    status, buffer_hours, locker_code
-                )
-                VALUES (%(order_id)s, %(user_name)s, %(user_wechat)s, %(sku)s, %(start_at)s, %(end_at)s,
-                        %(status)s, %(buffer_hours)s, %(locker_code)s)
-                RETURNING *
-                """,
-                payload,
-            ).fetchone()
-        except pg_errors.ExclusionViolation as exc:
-            raise ConflictError(f"Order insert conflicted: {exc}", sku=sku) from exc
-        except pg_errors.UniqueViolation as exc:
-            raise ConflictError(f"Order id already exists: {exc}", sku=sku) from exc
-        except pg_errors.CheckViolation as exc:
+            with _session_tx(session):
+                session.add(order)
+        except IntegrityError as exc:
+            orig = getattr(exc, "orig", None)
+            if isinstance(orig, pg_errors.ExclusionViolation):
+                raise ConflictError(f"Order insert conflicted: {orig}", sku=sku) from exc
+            if isinstance(orig, pg_errors.UniqueViolation):
+                raise ConflictError(f"Order id already exists: {orig}", sku=sku) from exc
+            if isinstance(orig, pg_errors.CheckViolation):
+                raise ConstraintError(f"Failed to insert order: {orig}") from exc
             raise ConstraintError(f"Failed to insert order: {exc}") from exc
-        except psycopg.Error as exc:
+        except SQLAlchemyError as exc:
             raise ConstraintError(f"Failed to insert order: {exc}") from exc
 
-    if not row:
-        raise ConflictError("Order insert failed or conflicted", sku=sku)
-    return _data_to_order(dict(row))
+        session.refresh(order)
+        return _model_to_order(order)
 
 
 def edit_order_from_db(
     order_id: str,
     *,
     patch: Dict[str, Any],
-    client: Optional[psycopg.Connection] = None,
+    client: Optional[Session] = None,
 ) -> Order:
     """
     Generic update helper; rejects terminal orders and invalid time ranges.
@@ -262,16 +262,16 @@ def edit_order_from_db(
     if not patch:
         raise ValidationError("Patch cannot be empty")
 
-    with get_conn(client) as db:
-        existing = _get_data_from_db(order_id, db)
+    with get_session(client) as session:
+        existing = _get_data_from_db(order_id, session)
         if not existing:
             raise NotFoundError(f"Order {order_id} not found")
-        if existing["status"] in TERMINAL_STATUSES:
+        if existing.status in TERMINAL_STATUSES:
             raise TerminalOrderError(f"Order {order_id} is terminal and cannot be modified")
 
         if "start_at" in patch or "end_at" in patch:
-            new_start = _iso_to_dt_utc(patch.get("start_at", existing["start_at"]))
-            new_end = _iso_to_dt_utc(patch.get("end_at", existing["end_at"]))
+            new_start = _iso_to_dt_utc(patch.get("start_at", existing.start_at))
+            new_end = _iso_to_dt_utc(patch.get("end_at", existing.end_at))
             _validate_time_range(new_start, new_end)
             patch["start_at"] = new_start
             patch["end_at"] = new_end
@@ -281,61 +281,57 @@ def edit_order_from_db(
         for key in ("created_at", "updated_at"):
             patch.pop(key, None)
 
-        fields = []
-        values = []
-        for key, value in patch.items():
-            fields.append(f"{key} = %s")
-            values.append(value)
-        if not fields:
+        if not patch:
             raise ValidationError("Patch cannot be empty")
 
-        values.append(order_id)
-
         try:
-            row = db.execute(
-                f"UPDATE orders SET {', '.join(fields)} WHERE order_id = %s RETURNING *",
-                values,
-            ).fetchone()
-        except pg_errors.ExclusionViolation as exc:
-            raise ConflictError(f"Order update conflicted: {exc}", sku=existing.get("sku")) from exc
-        except pg_errors.CheckViolation as exc:
+            with _session_tx(session):
+                for key, value in patch.items():
+                    setattr(existing, key, value)
+        except IntegrityError as exc:
+            orig = getattr(exc, "orig", None)
+            if isinstance(orig, pg_errors.ExclusionViolation):
+                raise ConflictError(
+                    f"Order update conflicted: {orig}",
+                    sku=existing.sku,
+                ) from exc
+            if isinstance(orig, pg_errors.CheckViolation):
+                raise ConstraintError(f"Failed to update order: {orig}") from exc
             raise ConstraintError(f"Failed to update order: {exc}") from exc
-        except psycopg.Error as exc:
+        except SQLAlchemyError as exc:
             raise ConstraintError(f"Failed to update order: {exc}") from exc
 
-    if not row:
-        raise ConflictError("Order update failed or conflicted", sku=existing.get("sku"))
-    return _data_to_order(dict(row))
+        session.refresh(existing)
+        return _model_to_order(existing)
 
 
 def cancel_order(
     order_id: str,
     *,
-    client: Optional[psycopg.Connection] = None,
+    client: Optional[Session] = None,
     hard_delete: bool = False,
 ) -> Order:
     """
     Cancel an order (default: soft cancel via status). Set hard_delete=True to remove the row.
     Returns: canceled or deleted Order.
     """
-    with get_conn(client) as db:
+    with get_session(client) as session:
         if hard_delete:
-            row = db.execute(
-                "DELETE FROM orders WHERE order_id = %s RETURNING *",
-                (order_id,),
-            ).fetchone()
-            if not row:
+            existing = _get_data_from_db(order_id, session)
+            if not existing:
                 raise NotFoundError(f"Order {order_id} not found for delete")
-            return _data_to_order(dict(row))
-        return edit_order_from_db(order_id, patch={"status": OrderStatus.CANCELED.value}, client=db)
+            with _session_tx(session):
+                session.delete(existing)
+            return _model_to_order(existing)
+        return edit_order_from_db(order_id, patch={"status": OrderStatus.CANCELED.value}, client=session)
 
 
-def mark_order_paid(order_id: str, *, client: Optional[psycopg.Connection] = None) -> Order:
+def mark_order_paid(order_id: str, *, client: Optional[Session] = None) -> Order:
     """Move order to paid. Returns: updated Order."""
     return edit_order_from_db(order_id, patch={"status": OrderStatus.PAID.value}, client=client)
 
 
-def finish_order(order_id: str, *, client: Optional[psycopg.Connection] = None) -> Order:
+def finish_order(order_id: str, *, client: Optional[Session] = None) -> Order:
     """Mark order as finished/successful (terminal). Returns: updated Order."""
     return edit_order_from_db(order_id, patch={"status": OrderStatus.SUCCESSFUL.value}, client=client)
 
@@ -344,7 +340,7 @@ def deliver_order(
     order_id: str,
     *,
     locker_code: str,
-    client: Optional[psycopg.Connection] = None,
+    client: Optional[Session] = None,
 ) -> Order:
     """Mark order as shipped; locker_code is required. Returns: updated Order."""
     if not locker_code:
@@ -356,12 +352,12 @@ def deliver_order(
     )
 
 
-def get_order_detail(order_id: str, *, client: Optional[psycopg.Connection] = None) -> Order:
+def get_order_detail(order_id: str, *, client: Optional[Session] = None) -> Order:
     """Fetch order detail by id. Returns: Order or raises NotFoundError."""
     row = _get_data_from_db(order_id, client)
     if not row:
         raise NotFoundError(f"Order {order_id} not found")
-    return _data_to_order(row)
+    return _model_to_order(row)
 
 
 def order_to_text(order: Order) -> str:

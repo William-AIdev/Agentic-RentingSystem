@@ -37,6 +37,7 @@ def client_and_cleanup():
             svc.cancel_order(order_id, client=client, hard_delete=True)
         except Exception:
             pass
+    client.close()
 
 
 def _new_order_id(created: List[str]) -> str:
