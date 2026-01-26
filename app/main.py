@@ -13,7 +13,7 @@ from app.graph import app
 from app.rag import rules_rag
 
 
-logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
+logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO),format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 def _ensure_thread_id(thread_id: str | None) -> str:
