@@ -200,7 +200,7 @@ def add_order_to_db(
     sku: str,
     start_at: datetime,
     end_at: datetime,
-    status: str = OrderStatus.RESERVED.value,
+    status: str,
     buffer_hours: Optional[int] = None,
     locker_code: Optional[str] = None,
     client: Optional[Session] = None,
