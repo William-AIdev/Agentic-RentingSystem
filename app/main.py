@@ -6,7 +6,7 @@ import uuid
 from typing import List, Tuple
 
 import gradio as gr
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 
 from app.config import settings
 from app.graph import app
@@ -39,18 +39,38 @@ def _load_chat(thread_id: str | None) -> Tuple[List[dict[str, str]], str]:
 
 
 def _chat(message: str, history: list[dict[str, str]], thread_id: str | None):
+    # streaming response generator
     thread_id = _ensure_thread_id(thread_id)
-    result = app.invoke(
+    history = history + [{"role": "user", "content": message}]
+    yield "", history, thread_id
+
+    assistant_index = len(history)
+    history = history + [{"role": "assistant", "content": ""}]
+    yield "", history, thread_id
+
+    content = ""
+    stream = app.stream(
         {"messages": [HumanMessage(content=message)]},
         config={"configurable": {"thread_id": thread_id}},
+        stream_mode="messages",
     )
-    ai_msg = result["messages"][-1]
-    content = ai_msg.content if isinstance(ai_msg, AIMessage) else str(ai_msg)
-    history = history + [
-        {"role": "user", "content": message},
-        {"role": "assistant", "content": content},
-    ]
-    return "", history, thread_id
+    for chunk in stream:
+        if isinstance(chunk, tuple) and chunk:
+            chunk = chunk[0]
+        if isinstance(chunk, AIMessageChunk):
+            content += chunk.content or ""
+        elif isinstance(chunk, AIMessage):
+            content = chunk.content or ""
+        elif isinstance(chunk, dict) and "messages" in chunk:
+            for msg in chunk["messages"]:
+                if isinstance(msg, AIMessageChunk):
+                    content += msg.content or ""
+                elif isinstance(msg, AIMessage):
+                    content = msg.content or ""
+        else:
+            continue
+        history[assistant_index]["content"] = content
+        yield "", history, thread_id
 
 
 def _new_chat():

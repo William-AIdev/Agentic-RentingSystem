@@ -36,6 +36,7 @@ _configure_langsmith_tracing()
 llm = init_chat_model(
     model=settings.openai_model,
     temperature=settings.openai_temperature,
+    streaming=True,
 ).bind_tools(TOOLS)
 
 
