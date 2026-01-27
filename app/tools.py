@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Dict
@@ -20,6 +21,7 @@ from services.order_services import (
     order_to_text,
     suggest_time_slots_text,
 )
+
 from services.order_types import (
     ConflictError,
     ConstraintError,
@@ -32,6 +34,8 @@ from services.order_types import (
 # Default input/output timezone is configurable (default Australia/Sydney).
 LOCAL_TZ = ZoneInfo(settings.local_timezone)
 UTC_TZ = timezone.utc
+
+
 
 
 def _order_to_dict(order) -> Dict[str, Any]:
@@ -74,29 +78,23 @@ def _normalize_patch(patch: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool
 def create_order_tool(
-    *,
-    order_id: str,
-    user_name: str,
-    user_wechat: str,
-    sku: str,
-    start_at: str,
-    end_at: str,
-    status: str | None = None,
-    buffer_hours: int | None = None,
-    locker_code: str | None = None,
+        *,
+        user_name: str,
+        user_wechat: str,
+        sku: str,
+        start_at: str,
+        end_at: str,
 ) -> Dict[str, Any]:
-    """Create an order."""
+    """Create an order. SKU means clothes colour/size code, for example: white_s"""
     try:
         order = add_order_to_db(
-            order_id=order_id,
+            order_id=f"{sku.upper()}_{uuid.uuid4().hex[:6]}",
             user_name=user_name,
             user_wechat=user_wechat,
             sku=sku,
             start_at=_parse_local_time(start_at),
             end_at=_parse_local_time(end_at),
-            status=status if status is not None else OrderStatus.RESERVED.value,
-            buffer_hours=buffer_hours,
-            locker_code=locker_code,
+            status=OrderStatus.RESERVED.value,
         )
         return {"result": _order_to_local_dict(order)}
     except (ConflictError, ConstraintError, ValidationError, ValueError) as exc:
@@ -121,11 +119,11 @@ def update_order_tool(*, order_id: str, patch: Dict[str, Any]) -> Dict[str, Any]
         order = edit_order_from_db(order_id, patch=normalized)
         return {"result": _order_to_local_dict(order)}
     except (
-        ConflictError,
-        ConstraintError,
-        ValidationError,
-        NotFoundError,
-        TerminalOrderError,
+            ConflictError,
+            ConstraintError,
+            ValidationError,
+            NotFoundError,
+            TerminalOrderError,
     ) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
@@ -172,11 +170,11 @@ def finish_order_tool(*, order_id: str) -> Dict[str, Any]:
 
 @tool
 def suggest_time_slots_tool(
-    *,
-    sku: str,
-    expected_start_at: str,
-    expected_end_at: str | None = None,
-    window_days: int = 3,
+        *,
+        sku: str,
+        expected_start_at: str,
+        expected_end_at: str | None = None,
+        window_days: int = 3,
 ) -> Dict[str, Any]:
     """Suggest available rental time slots around an expected time window."""
     try:
