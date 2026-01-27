@@ -20,10 +20,11 @@ from services.order_services import (
     order_to_text,
     suggest_time_slots_text,
 )
-from services.types import (
+from services.order_types import (
     ConflictError,
     ConstraintError,
     NotFoundError,
+    OrderStatus,
     TerminalOrderError,
     ValidationError,
 )
@@ -31,6 +32,7 @@ from services.types import (
 # Default input/output timezone is configurable (default Australia/Sydney).
 LOCAL_TZ = ZoneInfo(settings.local_timezone)
 UTC_TZ = timezone.utc
+
 
 def _order_to_dict(order) -> Dict[str, Any]:
     return asdict(order)
@@ -85,21 +87,17 @@ def create_order_tool(
 ) -> Dict[str, Any]:
     """Create an order."""
     try:
-        data = {
-            "order_id": order_id,
-            "user_name": user_name,
-            "user_wechat": user_wechat,
-            "sku": sku,
-            "start_at": _parse_local_time(start_at),
-            "end_at": _parse_local_time(end_at),
-        }
-        if status is not None:
-            data["status"] = status
-        if buffer_hours is not None:
-            data["buffer_hours"] = buffer_hours
-        if locker_code is not None:
-            data["locker_code"] = locker_code
-        order = add_order_to_db(**data)
+        order = add_order_to_db(
+            order_id=order_id,
+            user_name=user_name,
+            user_wechat=user_wechat,
+            sku=sku,
+            start_at=_parse_local_time(start_at),
+            end_at=_parse_local_time(end_at),
+            status=status if status is not None else OrderStatus.RESERVED.value,
+            buffer_hours=buffer_hours,
+            locker_code=locker_code,
+        )
         return {"result": _order_to_local_dict(order)}
     except (ConflictError, ConstraintError, ValidationError, ValueError) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
@@ -122,7 +120,13 @@ def update_order_tool(*, order_id: str, patch: Dict[str, Any]) -> Dict[str, Any]
         normalized = _normalize_patch(dict(patch))
         order = edit_order_from_db(order_id, patch=normalized)
         return {"result": _order_to_local_dict(order)}
-    except (ConflictError, ConstraintError, ValidationError, NotFoundError, TerminalOrderError) as exc:
+    except (
+        ConflictError,
+        ConstraintError,
+        ValidationError,
+        NotFoundError,
+        TerminalOrderError,
+    ) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
 

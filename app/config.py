@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+
 def _to_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default

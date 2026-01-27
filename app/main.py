@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
-from typing import List, Tuple
+from typing import Any, List, Tuple, cast
 
 import gradio as gr
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
@@ -12,8 +12,22 @@ from app.config import settings
 from app.graph import app
 from app.rag import rules_rag
 
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
 
-logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO),format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
+def _content_to_text(content: str | list[str | dict]) -> str:
+    if isinstance(content, str):
+        return content
+    parts: list[str] = []
+    for item in content:
+        if isinstance(item, str):
+            parts.append(item)
+        elif isinstance(item, dict):
+            parts.append(str(item))
+    return "".join(parts)
 
 
 def _ensure_thread_id(thread_id: str | None) -> str:
@@ -30,9 +44,9 @@ def _load_chat(thread_id: str | None) -> Tuple[List[dict[str, str]], str]:
         messages = state.values.get("messages", []) if state else []
         for message in messages:
             if isinstance(message, HumanMessage):
-                history.append({"role": "user", "content": message.content})
+                history.append({"role": "user", "content": _content_to_text(message.content)})
             elif isinstance(message, AIMessage):
-                history.append({"role": "assistant", "content": message.content})
+                history.append({"role": "assistant", "content": _content_to_text(message.content)})
     except Exception:
         pass
     return history, thread_id
@@ -49,8 +63,9 @@ def _chat(message: str, history: list[dict[str, str]], thread_id: str | None):
     yield "", history, thread_id
 
     content = ""
+    input_state = {"messages": [HumanMessage(content=message)]}
     stream = app.stream(
-        {"messages": [HumanMessage(content=message)]},
+        cast(Any, input_state),
         config={"configurable": {"thread_id": thread_id}},
         stream_mode="messages",
     )
@@ -58,15 +73,15 @@ def _chat(message: str, history: list[dict[str, str]], thread_id: str | None):
         if isinstance(chunk, tuple) and chunk:
             chunk = chunk[0]
         if isinstance(chunk, AIMessageChunk):
-            content += chunk.content or ""
+            content += _content_to_text(chunk.content or "")
         elif isinstance(chunk, AIMessage):
-            content = chunk.content or ""
+            content = _content_to_text(chunk.content or "")
         elif isinstance(chunk, dict) and "messages" in chunk:
             for msg in chunk["messages"]:
                 if isinstance(msg, AIMessageChunk):
-                    content += msg.content or ""
+                    content += _content_to_text(msg.content or "")
                 elif isinstance(msg, AIMessage):
-                    content = msg.content or ""
+                    content = _content_to_text(msg.content or "")
         else:
             continue
         history[assistant_index]["content"] = content
@@ -88,11 +103,15 @@ def build_ui() -> gr.Blocks:
         new_chat = gr.Button("新对话")
 
         demo.load(_load_chat, inputs=browser_state, outputs=[chatbot, browser_state])
-        msg.submit(_chat, inputs=[msg, chatbot, browser_state], outputs=[msg, chatbot, browser_state])
-        send.click(_chat, inputs=[msg, chatbot, browser_state], outputs=[msg, chatbot, browser_state])
+        msg.submit(
+            _chat, inputs=[msg, chatbot, browser_state], outputs=[msg, chatbot, browser_state]
+        )
+        send.click(
+            _chat, inputs=[msg, chatbot, browser_state], outputs=[msg, chatbot, browser_state]
+        )
         new_chat.click(_new_chat, outputs=[chatbot, browser_state])
 
-    return demo
+    return cast(gr.Blocks, demo)
 
 
 def main() -> None:
@@ -100,12 +119,13 @@ def main() -> None:
     threading.Thread(target=lambda: rules_rag.error, daemon=True).start()
     ui = build_ui()
     ui.queue()
-    ui.launch(server_name=settings.app_host,
-              server_port=settings.app_port,
-              debug=True,
-              show_error=True,
-              theme=gr.themes.Citrus()
-              )
+    ui.launch(
+        server_name=settings.app_host,
+        server_port=settings.app_port,
+        debug=True,
+        show_error=True,
+        theme=gr.themes.Citrus(),
+    )
 
 
 if __name__ == "__main__":

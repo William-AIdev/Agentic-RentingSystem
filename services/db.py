@@ -8,7 +8,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
-
 _DEFAULT_PORT = 5432
 _DEFAULT_POOL_SIZE = 5
 

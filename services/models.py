@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import ENUM, TSTZRANGE
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.schema import FetchedValue
 
-from services.types import OrderStatus
+from services.order_types import OrderStatus
 
 
 class Base(DeclarativeBase):
@@ -37,9 +37,7 @@ class OrderModel(Base):
     sku: Mapped[str] = mapped_column(String, nullable=False)
     start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    buffer_hours: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default=text("3")
-    )
+    buffer_hours: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("3"))
     occupied: Mapped[object] = mapped_column(
         TSTZRANGE, nullable=False, server_default=FetchedValue()
     )
