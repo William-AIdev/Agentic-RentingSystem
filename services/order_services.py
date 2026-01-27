@@ -8,7 +8,6 @@ from psycopg import errors as pg_errors
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
-
 from services.db import create_db_client, get_session
 from services.models import OrderModel
 from services.types import (
@@ -128,7 +127,7 @@ def suggest_time_slots_text(
     """
     Suggest available rental time slots within +/- window_days around expected time.
     User input without tzinfo is treated as UTC.
-    Returns: human-readable text with available slots.
+    Returns: human-readable text with available slots, timezone is Sydney.
     """
     sku = sku.strip().upper()
     expected_start = _iso_to_dt_utc(expected_start_at)
@@ -360,19 +359,24 @@ def get_order_detail(order_id: str, *, client: Optional[Session] = None) -> Orde
     return _model_to_order(row)
 
 
-def order_to_text(order: Order) -> str:
+def order_to_text(order: Order, *, tz: tzinfo = UTC_TZ) -> str:
     """Convert Order dataclass to human-readable text."""
+    def _fmt(dt: datetime) -> str:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC_TZ)
+        return dt.astimezone(tz).isoformat()
+
     lines = [
         f"Order ID: {order.order_id}",
         f"User Name: {order.user_name}",
         f"WeChat: {order.user_wechat}",
         f"SKU: {order.sku}",
-        f"Start At: {order.start_at_iso.isoformat()}",
-        f"End At: {order.end_at_iso.isoformat()}",
+        f"Start At: {_fmt(order.start_at_iso)}",
+        f"End At: {_fmt(order.end_at_iso)}",
         f"Buffer Hours: {order.buffer_hours}",
         f"Status: {order.status}",
         f"Locker Code: {order.locker_code or 'N/A'}",
-        f"Created At: {order.created_at.isoformat()}",
-        f"Updated At: {order.updated_at.isoformat()}",
+        f"Created At: {_fmt(order.created_at)}",
+        f"Updated At: {_fmt(order.updated_at)}",
     ]
     return "\n".join(lines)

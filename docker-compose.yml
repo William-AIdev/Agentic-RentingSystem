@@ -42,7 +42,9 @@ services:
       ]
     volumes:
       - ./:/app # for development
+      - hf_cache:/opt/hf # cache huggingface models
 
 volumes:
   pgdata:
   qdrant_data:
+  hf_cache:

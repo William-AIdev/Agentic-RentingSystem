@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
+from zoneinfo import ZoneInfo
 
 from langchain_core.tools import tool
 
 from app.rag import rules_rag
+from app.config import settings
 from services.order_services import (
     add_order_to_db,
     cancel_order,
@@ -26,21 +28,49 @@ from services.types import (
     ValidationError,
 )
 
+# Default input/output timezone is configurable (default Australia/Sydney).
+LOCAL_TZ = ZoneInfo(settings.local_timezone)
+UTC_TZ = timezone.utc
 
 def _order_to_dict(order) -> Dict[str, Any]:
     return asdict(order)
 
 
+def _to_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=LOCAL_TZ)
+    return dt.astimezone(UTC_TZ)
+
+
+def _parse_local_time(value: str | datetime) -> datetime:
+    if isinstance(value, datetime):
+        return _to_utc(value)
+    return _to_utc(datetime.fromisoformat(value))
+
+
+def _to_local(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC_TZ)
+    return dt.astimezone(LOCAL_TZ)
+
+
+def _order_to_local_dict(order) -> Dict[str, Any]:
+    data = asdict(order)
+    for key in ("start_at_iso", "end_at_iso", "created_at", "updated_at"):
+        if key in data and isinstance(data[key], datetime):
+            data[key] = _to_local(data[key]).isoformat()
+    return data
+
+
 def _normalize_patch(patch: Dict[str, Any]) -> Dict[str, Any]:
     if "start_at" in patch and isinstance(patch["start_at"], str):
-        patch["start_at"] = datetime.fromisoformat(patch["start_at"])
+        patch["start_at"] = _parse_local_time(patch["start_at"])
     if "end_at" in patch and isinstance(patch["end_at"], str):
-        patch["end_at"] = datetime.fromisoformat(patch["end_at"])
+        patch["end_at"] = _parse_local_time(patch["end_at"])
     return patch
 
 
 @tool
-# Keyword-only args keep tool schema explicit for the LLM.
 def create_order_tool(
     *,
     order_id: str,
@@ -60,8 +90,8 @@ def create_order_tool(
             "user_name": user_name,
             "user_wechat": user_wechat,
             "sku": sku,
-            "start_at": datetime.fromisoformat(start_at),
-            "end_at": datetime.fromisoformat(end_at),
+            "start_at": _parse_local_time(start_at),
+            "end_at": _parse_local_time(end_at),
         }
         if status is not None:
             data["status"] = status
@@ -70,80 +100,73 @@ def create_order_tool(
         if locker_code is not None:
             data["locker_code"] = locker_code
         order = add_order_to_db(**data)
-        return {"result": _order_to_dict(order)}
+        return {"result": _order_to_local_dict(order)}
     except (ConflictError, ConstraintError, ValidationError, ValueError) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
 
 @tool
-# Keyword-only args keep tool schema explicit for the LLM.
 def get_order_tool(*, order_id: str) -> Dict[str, Any]:
     """Get order detail."""
     try:
         order = get_order_detail(order_id)
-        return {"result": order_to_text(order)}
+        return {"result": order_to_text(order, tz=LOCAL_TZ)}
     except NotFoundError as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
 
 @tool
-# Keyword-only args keep tool schema explicit for the LLM.
 def update_order_tool(*, order_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
     """Update order by patch."""
     try:
         normalized = _normalize_patch(dict(patch))
         order = edit_order_from_db(order_id, patch=normalized)
-        return {"result": _order_to_dict(order)}
+        return {"result": _order_to_local_dict(order)}
     except (ConflictError, ConstraintError, ValidationError, NotFoundError, TerminalOrderError) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
 
 @tool
-# Keyword-only args keep tool schema explicit for the LLM.
 def cancel_order_tool(*, order_id: str, hard_delete: bool = False) -> Dict[str, Any]:
     """Cancel order."""
     try:
         order = cancel_order(order_id, hard_delete=hard_delete)
-        return {"result": _order_to_dict(order)}
+        return {"result": _order_to_local_dict(order)}
     except (NotFoundError, ValidationError, TerminalOrderError) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
 
 @tool
-# Keyword-only args keep tool schema explicit for the LLM.
 def mark_paid_tool(*, order_id: str) -> Dict[str, Any]:
     """Mark order paid."""
     try:
         order = mark_order_paid(order_id)
-        return {"result": _order_to_dict(order)}
+        return {"result": _order_to_local_dict(order)}
     except (NotFoundError, ValidationError, TerminalOrderError) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
 
 @tool
-# Keyword-only args keep tool schema explicit for the LLM.
 def deliver_order_tool(*, order_id: str, locker_code: str) -> Dict[str, Any]:
     """Deliver order with locker_code."""
     try:
         order = deliver_order(order_id, locker_code=locker_code)
-        return {"result": _order_to_dict(order)}
+        return {"result": _order_to_local_dict(order)}
     except (NotFoundError, ValidationError, ConstraintError, TerminalOrderError) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
 
 @tool
-# Keyword-only args keep tool schema explicit for the LLM.
 def finish_order_tool(*, order_id: str) -> Dict[str, Any]:
     """Finish order."""
     try:
         order = finish_order(order_id)
-        return {"result": _order_to_dict(order)}
+        return {"result": _order_to_local_dict(order)}
     except (NotFoundError, ValidationError, TerminalOrderError) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
 
 @tool
-# Keyword-only args keep tool schema explicit for the LLM.
 def suggest_time_slots_tool(
     *,
     sku: str,
@@ -155,8 +178,8 @@ def suggest_time_slots_tool(
     try:
         text = suggest_time_slots_text(
             sku=sku,
-            expected_start_at=expected_start_at,
-            expected_end_at=expected_end_at,
+            expected_start_at=_parse_local_time(expected_start_at),
+            expected_end_at=_parse_local_time(expected_end_at) if expected_end_at else None,
             window_days=window_days,
         )
         return {"result": text}
@@ -166,8 +189,7 @@ def suggest_time_slots_tool(
 
 @tool
 def rag_rules_tool(*, question: str) -> Dict[str, Any]:
-    """基于本地规则文件回答客户的规则/流程/计费/押金等问题。如果返回了正在初始化，则直接回复让客户稍后再试。
-    若之前因为未初始化而回答失败，而客户再次尝试询问，则你需要再次尝试调用该工具"""
+    """基于本地规则文件回答客户的规则/流程/计费/押金等问题。如果返回了正在初始化，则直接回复让客户稍后再试。"""
     if not rules_rag.ready:
         return {"result": "规则库正在初始化，请稍后再试。"}
     snippets = rules_rag.query(question)

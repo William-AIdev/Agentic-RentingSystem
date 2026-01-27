@@ -16,6 +16,8 @@ class Settings:
     app_host: str = os.getenv("APP_HOST", "0.0.0.0")
     app_port: int = int(os.getenv("APP_PORT", "7860"))
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
+    # Default timezone used to interpret user-provided local times.
+    local_timezone: str = os.getenv("LOCAL_TIMEZONE", "Australia/Sydney")
 
     # LLM configuration.
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5-nano")

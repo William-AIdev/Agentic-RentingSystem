@@ -6,7 +6,7 @@ import hashlib
 import threading
 from typing import List, Optional
 
-from langchain_community.embeddings import HuggingFaceBgeEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
@@ -81,11 +81,10 @@ class RulesRAG:
             # Map alias -> collection for atomic cutover after rebuild.
             aliases = {a.alias_name: a.collection_name for a in client.get_aliases().aliases}
 
-            embeddings = HuggingFaceBgeEmbeddings(
+            embeddings = HuggingFaceEmbeddings(
                 model_name=settings.embedding_model,
                 model_kwargs={"device": settings.embedding_device},
                 encode_kwargs={"normalize_embeddings": settings.embedding_normalize},
-                query_instruction="",
             )
 
             # Reuse when alias already points to the correct rules hash collection.
