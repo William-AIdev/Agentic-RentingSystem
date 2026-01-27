@@ -49,14 +49,6 @@ class TimeRange:
     start_at: datetime
     end_at: datetime
 
-
-# @dataclass(frozen=True)
-# class Suggestion:
-#     """Suggested alternative time slot for a request that conflicts."""
-#     start_at_iso: datetime
-#     end_at_iso: datetime
-
-
 # =========
 # Exceptions (service layer surfaces clear failure reasons)
 # =========

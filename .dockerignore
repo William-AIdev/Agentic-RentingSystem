@@ -1,0 +1,14 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.ipynb
+.env
+.DS_Store
+.idea
+.pytest_cache
+
+# Optional: keep tests out of image
+/tests
