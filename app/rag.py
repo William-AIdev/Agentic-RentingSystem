@@ -14,7 +14,6 @@ from langchain_text_splitters import MarkdownHeaderTextSplitter
 
 from app.config import settings
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -117,7 +116,9 @@ class RulesRAG:
             )
 
             # Switch alias only after the new collection is fully built.
-            alias_ops = []
+            alias_ops: list[
+                qdrant_models.CreateAliasOperation | qdrant_models.DeleteAliasOperation
+            ] = []
             if base_collection in aliases:
                 alias_ops.append(
                     qdrant_models.DeleteAliasOperation(

@@ -16,7 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from services import order_services as svc
-from services.types import (
+from services.order_types import (
     NotFoundError,
     OrderStatus,
     TerminalOrderError,

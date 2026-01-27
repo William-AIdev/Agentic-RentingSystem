@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from services.db import create_db_client, get_session
 from services.models import OrderModel
-from services.types import (
+from services.order_types import (
     OCCUPYING_STATUSES,
     TERMINAL_STATUSES,
     ConflictError,
@@ -102,12 +102,12 @@ def _merge_time_ranges(ranges: list[TimeRange]) -> list[TimeRange]:
     return merged
 
 
-def _format_slots_text(sku: str, window_start: datetime, window_end: datetime, slots: list[TimeRange]) -> str:
+def _format_slots_text(
+    sku: str, window_start: datetime, window_end: datetime, slots: list[TimeRange]
+) -> str:
     sku = sku.strip().upper()
     if not slots:
-        return (
-            f"SKU {sku} 在 {window_start.isoformat()} 到 {window_end.isoformat()} 内无可供选择的时间段。"
-        )
+        return f"SKU {sku} 在 {window_start.isoformat()} 到 {window_end.isoformat()} 内无可供选择的时间段。"
     lines = [
         f"SKU {sku} 可供选择的时间段（{window_start.isoformat()} 至 {window_end.isoformat()}）："
     ]
@@ -151,12 +151,16 @@ def suggest_time_slots_text(
         return _format_slots_text(sku, window_start, window_end, [])
 
     with get_session(client) as session:
-        rows = session.execute(
-            select(OrderModel).where(
-                OrderModel.sku == sku,
-                OrderModel.status.in_(list(OCCUPYING_STATUSES)),
+        rows = (
+            session.execute(
+                select(OrderModel).where(
+                    OrderModel.sku == sku,
+                    OrderModel.status.in_(list(OCCUPYING_STATUSES)),
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
     occupied: list[TimeRange] = []
     for row in rows:
@@ -183,9 +187,7 @@ def suggest_time_slots_text(
         free_slots.append(TimeRange(start_at=cursor, end_at=window_end))
 
     # Only keep slots that can fit the requested duration.
-    filtered_slots = [
-        slot for slot in free_slots if (slot.end_at - slot.start_at) >= duration
-    ]
+    filtered_slots = [slot for slot in free_slots if (slot.end_at - slot.start_at) >= duration]
 
     return _format_slots_text(sku, window_start, window_end, filtered_slots)
 
@@ -322,7 +324,9 @@ def cancel_order(
             with _session_tx(session):
                 session.delete(existing)
             return _model_to_order(existing)
-        return edit_order_from_db(order_id, patch={"status": OrderStatus.CANCELED.value}, client=session)
+        return edit_order_from_db(
+            order_id, patch={"status": OrderStatus.CANCELED.value}, client=session
+        )
 
 
 def mark_order_paid(order_id: str, *, client: Optional[Session] = None) -> Order:
@@ -332,7 +336,9 @@ def mark_order_paid(order_id: str, *, client: Optional[Session] = None) -> Order
 
 def finish_order(order_id: str, *, client: Optional[Session] = None) -> Order:
     """Mark order as finished/successful (terminal). Returns: updated Order."""
-    return edit_order_from_db(order_id, patch={"status": OrderStatus.SUCCESSFUL.value}, client=client)
+    return edit_order_from_db(
+        order_id, patch={"status": OrderStatus.SUCCESSFUL.value}, client=client
+    )
 
 
 def deliver_order(
@@ -361,6 +367,7 @@ def get_order_detail(order_id: str, *, client: Optional[Session] = None) -> Orde
 
 def order_to_text(order: Order, *, tz: tzinfo = UTC_TZ) -> str:
     """Convert Order dataclass to human-readable text."""
+
     def _fmt(dt: datetime) -> str:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC_TZ)

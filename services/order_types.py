@@ -1,25 +1,23 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Tuple, TypedDict, Literal
+from typing import List, Optional
 
 # =========
 # Domain Types
 # =========
+
 
 class OrderStatus(str, Enum):
     RESERVED = "reserved"
     PAID = "paid"
     SHIPPED = "shipped"
     OVERDUE = "overdue"
-    SUCCESSFUL = "successful"   # terminal
-    CANCELED = "canceled"       # terminal
+    SUCCESSFUL = "successful"  # terminal
+    CANCELED = "canceled"  # terminal
 
 
-TERMINAL_STATUSES = {
-    OrderStatus.SUCCESSFUL.value, 
-    OrderStatus.CANCELED.value
-}
+TERMINAL_STATUSES = {OrderStatus.SUCCESSFUL.value, OrderStatus.CANCELED.value}
 OCCUPYING_STATUSES = {
     OrderStatus.RESERVED.value,
     OrderStatus.PAID.value,
@@ -31,6 +29,7 @@ OCCUPYING_STATUSES = {
 @dataclass(frozen=True)
 class Order:
     """In-memory representation of a row in orders table."""
+
     order_id: str
     user_name: str
     user_wechat: str
@@ -49,9 +48,11 @@ class TimeRange:
     start_at: datetime
     end_at: datetime
 
+
 # =========
 # Exceptions (service layer surfaces clear failure reasons)
 # =========
+
 
 class OrdersServiceError(Exception):
     """Base error for order operations."""
@@ -74,6 +75,7 @@ class ConflictError(OrdersServiceError):
     Raised when a write operation conflicts with existing occupancy.
     Attach conflicts and suggestion if available.
     """
+
     def __init__(
         self,
         message: str,

@@ -17,6 +17,11 @@ huggingface-hub>=0.20.0
 # Database ORM
 sqlalchemy>=2.0.0
 
+# Dev tooling
+ruff>=0.6.0
+black>=24.0.0
+mypy>=1.10.0
+
 # Vector store + embeddings
 langchain-qdrant>=0.1.4
 qdrant-client>=1.11.1

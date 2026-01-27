@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import BaseMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
 from app.config import settings
 from app.tools import TOOLS
-
 
 SYSTEM_PROMPT = (
     "你是衣物租赁助手，只需回答相关问题，其它问题可忽略。\n"
@@ -41,7 +40,9 @@ llm = init_chat_model(
 
 
 def agent_node(state: MessagesState) -> Dict[str, Any]:
-    response = llm.invoke([SystemMessage(content=SYSTEM_PROMPT)] + state["messages"])
+    messages = cast(list[BaseMessage], state["messages"])
+    system_messages: list[BaseMessage] = [SystemMessage(content=SYSTEM_PROMPT)]
+    response = llm.invoke(system_messages + messages)
     return {"messages": [response]}
 
 
