@@ -85,7 +85,7 @@ def create_order_tool(
     """Create an order. SKU means clothes colour/size code, for example: white_s"""
     try:
         order = add_order_to_db(
-            order_id=f"{sku.upper()}_{uuid.uuid4().hex[:6]}",
+            order_id=f"{uuid.uuid4().hex[:8]}",
             user_name=user_name,
             user_wechat=user_wechat,
             sku=sku,

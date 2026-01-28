@@ -95,10 +95,10 @@ def _new_chat():
 
 def build_ui() -> gr.Blocks:
     with gr.Blocks(title=settings.app_title) as demo:
-        gr.Markdown("""# Rental Agent - 基于 LangGraph 的订单/规则助手。""")
+        gr.Markdown("""# Rental Agent - 基于 LangGraph与RAG 的订单/规则助手。""")
         browser_state = gr.BrowserState(storage_key="rental_thread_id")
-        chatbot = gr.Chatbot(label="对话")
-        msg = gr.Textbox(label="输入", placeholder="输入问题或订单指令")
+        chatbot = gr.Chatbot(label="和agent对话")
+        msg = gr.Textbox(label="用户输入", placeholder="输入问题或订单指令")
         send = gr.Button("发送")
         new_chat = gr.Button("新对话")
 

@@ -2,8 +2,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict Ze75MQfS98BuJExusR5V08FKlrfd7heHTLQDMHRVPg1lowmAHEjLYydUPKqR3vc
-
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
 
@@ -476,5 +474,4 @@ ALTER TABLE ONLY public.orders
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Ze75MQfS98BuJExusR5V08FKlrfd7heHTLQDMHRVPg1lowmAHEjLYydUPKqR3vc
 
