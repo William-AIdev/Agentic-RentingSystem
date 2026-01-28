@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
 
 # =========
 # Domain Types
@@ -38,7 +37,7 @@ class Order:
     end_at_iso: datetime
     buffer_hours: int
     status: str
-    locker_code: Optional[str]
+    locker_code: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -80,9 +79,9 @@ class ConflictError(OrdersServiceError):
         self,
         message: str,
         *,
-        sku: Optional[str] = None,
-        conflicts: Optional[List[str]] = None,
-        suggestion: Optional[TimeRange] = None,
+        sku: str | None = None,
+        conflicts: list[str] | None = None,
+        suggestion: TimeRange | None = None,
     ) -> None:
         super().__init__(message)
         self.sku = sku

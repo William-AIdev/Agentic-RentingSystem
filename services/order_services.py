@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from datetime import datetime, timedelta, timezone, tzinfo
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta, tzinfo
+from typing import Any
 
 from psycopg import errors as pg_errors
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
-from services.db import create_db_client, get_session
+
+from services.db import get_session
 from services.models import OrderModel
 from services.order_types import (
     OCCUPYING_STATUSES,
@@ -24,7 +25,7 @@ from services.order_types import (
 )
 
 # Default timezone for internal datetime handling in this module.
-UTC_TZ: tzinfo = timezone.utc
+UTC_TZ: tzinfo = UTC
 
 # if not specified in DB
 DEFAULT_BUFFER_HOURS = 3
@@ -74,7 +75,7 @@ def _session_tx(session: Session):
     return session.begin()
 
 
-def _get_data_from_db(order_id: str, client: Optional[Session] = None) -> Optional[OrderModel]:
+def _get_data_from_db(order_id: str, client: Session | None = None) -> OrderModel | None:
     """Fetch ORM row by order_id; None if not found."""
     with get_session(client) as session:
         return session.execute(
@@ -121,7 +122,7 @@ def suggest_time_slots_text(
     sku: str,
     expected_start_at: datetime | str,
     expected_end_at: datetime | str | None = None,
-    client: Optional[Session] = None,
+    client: Session | None = None,
     window_days: int = 3,
 ) -> str:
     """
@@ -201,9 +202,9 @@ def add_order_to_db(
     start_at: datetime,
     end_at: datetime,
     status: str,
-    buffer_hours: Optional[int] = None,
-    locker_code: Optional[str] = None,
-    client: Optional[Session] = None,
+    buffer_hours: int | None = None,
+    locker_code: str | None = None,
+    client: Session | None = None,
 ) -> Order:
     """
     Insert a new order row to DB (default status is RESERVED).
@@ -252,8 +253,8 @@ def add_order_to_db(
 def edit_order_from_db(
     order_id: str,
     *,
-    patch: Dict[str, Any],
-    client: Optional[Session] = None,
+    patch: dict[str, Any],
+    client: Session | None = None,
 ) -> Order:
     """
     Generic update helper; rejects terminal orders and invalid time ranges.
@@ -309,7 +310,7 @@ def edit_order_from_db(
 def cancel_order(
     order_id: str,
     *,
-    client: Optional[Session] = None,
+    client: Session | None = None,
     hard_delete: bool = False,
 ) -> Order:
     """
@@ -329,12 +330,12 @@ def cancel_order(
         )
 
 
-def mark_order_paid(order_id: str, *, client: Optional[Session] = None) -> Order:
+def mark_order_paid(order_id: str, *, client: Session | None = None) -> Order:
     """Move order to paid. Returns: updated Order."""
     return edit_order_from_db(order_id, patch={"status": OrderStatus.PAID.value}, client=client)
 
 
-def finish_order(order_id: str, *, client: Optional[Session] = None) -> Order:
+def finish_order(order_id: str, *, client: Session | None = None) -> Order:
     """Mark order as finished/successful (terminal). Returns: updated Order."""
     return edit_order_from_db(
         order_id, patch={"status": OrderStatus.SUCCESSFUL.value}, client=client
@@ -345,7 +346,7 @@ def deliver_order(
     order_id: str,
     *,
     locker_code: str,
-    client: Optional[Session] = None,
+    client: Session | None = None,
 ) -> Order:
     """Mark order as shipped; locker_code is required. Returns: updated Order."""
     if not locker_code:
@@ -357,7 +358,7 @@ def deliver_order(
     )
 
 
-def get_order_detail(order_id: str, *, client: Optional[Session] = None) -> Order:
+def get_order_detail(order_id: str, *, client: Session | None = None) -> Order:
     """Fetch order detail by id. Returns: Order or raises NotFoundError."""
     row = _get_data_from_db(order_id, client)
     if not row:

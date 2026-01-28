@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import threading
 import uuid
-from typing import Any, List, Tuple, cast
+from typing import Any, cast
 
 import gradio as gr
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
@@ -36,7 +36,7 @@ def _ensure_thread_id(thread_id: str | None) -> str:
     return f"thread-{uuid.uuid4().hex}"
 
 
-def _load_chat(thread_id: str | None) -> Tuple[List[dict[str, str]], str]:
+def _load_chat(thread_id: str | None) -> tuple[list[dict[str, str]], str]:
     thread_id = _ensure_thread_id(thread_id)
     history: list[dict[str, str]] = []
     try:

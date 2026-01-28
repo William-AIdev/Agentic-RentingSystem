@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import BaseMessage, SystemMessage
@@ -39,7 +39,7 @@ llm = init_chat_model(
 ).bind_tools(TOOLS)
 
 
-def agent_node(state: MessagesState) -> Dict[str, Any]:
+def agent_node(state: MessagesState) -> dict[str, Any]:
     messages = cast(list[BaseMessage], state["messages"])
     system_messages: list[BaseMessage] = [SystemMessage(content=SYSTEM_PROMPT)]
     response = llm.invoke(system_messages + messages)

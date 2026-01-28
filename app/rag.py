@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import logging
-from pathlib import Path
 import hashlib
+import logging
 import threading
-from typing import List, Optional
+from pathlib import Path
 
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
+from langchain_text_splitters import MarkdownHeaderTextSplitter
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
-from langchain_text_splitters import MarkdownHeaderTextSplitter
 
 from app.config import settings
 
@@ -27,9 +26,9 @@ _HEADERS_TO_SPLIT_ON = [
 
 class RulesRAG:
     def __init__(self) -> None:
-        self._vectorstore: Optional[QdrantVectorStore] = None
+        self._vectorstore: QdrantVectorStore | None = None
         self._initialized = False
-        self._error: Optional[str] = None
+        self._error: str | None = None
         self._ready = threading.Event()
 
     def _read_rules_text(self, path: Path) -> str:
@@ -37,7 +36,7 @@ class RulesRAG:
             return ""
         return path.read_text(encoding="utf-8")
 
-    def _split_rule_text(self, text: str) -> List[str]:
+    def _split_rule_text(self, text: str) -> list[str]:
         if not text:
             return []
         splitter = MarkdownHeaderTextSplitter(headers_to_split_on=_HEADERS_TO_SPLIT_ON)
@@ -152,7 +151,7 @@ class RulesRAG:
             logger.exception("Failed to initialize RAG index")
             self._ready.set()
 
-    def query(self, question: str, k: Optional[int] = None) -> List[str]:
+    def query(self, question: str, k: int | None = None) -> list[str]:
         self._init_vectorstore()
         if self._vectorstore is None:
             return []
@@ -161,7 +160,7 @@ class RulesRAG:
         return [r.page_content for r in results]
 
     @property
-    def error(self) -> Optional[str]:
+    def error(self) -> str | None:
         self._init_vectorstore()
         return self._error
 

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import asdict
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from langchain_core.tools import tool
 
-from app.rag import rules_rag
 from app.config import settings
+from app.rag import rules_rag
 from services.order_services import (
     add_order_to_db,
     cancel_order,
@@ -21,7 +21,6 @@ from services.order_services import (
     order_to_text,
     suggest_time_slots_text,
 )
-
 from services.order_types import (
     ConflictError,
     ConstraintError,
@@ -33,12 +32,10 @@ from services.order_types import (
 
 # Default input/output timezone is configurable (default Australia/Sydney).
 LOCAL_TZ = ZoneInfo(settings.local_timezone)
-UTC_TZ = timezone.utc
+UTC_TZ = UTC
 
 
-
-
-def _order_to_dict(order) -> Dict[str, Any]:
+def _order_to_dict(order) -> dict[str, Any]:
     return asdict(order)
 
 
@@ -60,7 +57,7 @@ def _to_local(dt: datetime) -> datetime:
     return dt.astimezone(LOCAL_TZ)
 
 
-def _order_to_local_dict(order) -> Dict[str, Any]:
+def _order_to_local_dict(order) -> dict[str, Any]:
     data = asdict(order)
     for key in ("start_at_iso", "end_at_iso", "created_at", "updated_at"):
         if key in data and isinstance(data[key], datetime):
@@ -68,7 +65,7 @@ def _order_to_local_dict(order) -> Dict[str, Any]:
     return data
 
 
-def _normalize_patch(patch: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_patch(patch: dict[str, Any]) -> dict[str, Any]:
     if "start_at" in patch and isinstance(patch["start_at"], str):
         patch["start_at"] = _parse_local_time(patch["start_at"])
     if "end_at" in patch and isinstance(patch["end_at"], str):
@@ -78,13 +75,13 @@ def _normalize_patch(patch: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool
 def create_order_tool(
-        *,
-        user_name: str,
-        user_wechat: str,
-        sku: str,
-        start_at: str,
-        end_at: str,
-) -> Dict[str, Any]:
+    *,
+    user_name: str,
+    user_wechat: str,
+    sku: str,
+    start_at: str,
+    end_at: str,
+) -> dict[str, Any]:
     """Create an order. SKU means clothes colour/size code, for example: white_s"""
     try:
         order = add_order_to_db(
@@ -102,7 +99,7 @@ def create_order_tool(
 
 
 @tool
-def get_order_tool(*, order_id: str) -> Dict[str, Any]:
+def get_order_tool(*, order_id: str) -> dict[str, Any]:
     """Get order detail."""
     try:
         order = get_order_detail(order_id)
@@ -112,24 +109,24 @@ def get_order_tool(*, order_id: str) -> Dict[str, Any]:
 
 
 @tool
-def update_order_tool(*, order_id: str, patch: Dict[str, Any]) -> Dict[str, Any]:
+def update_order_tool(*, order_id: str, patch: dict[str, Any]) -> dict[str, Any]:
     """Update order by patch."""
     try:
         normalized = _normalize_patch(dict(patch))
         order = edit_order_from_db(order_id, patch=normalized)
         return {"result": _order_to_local_dict(order)}
     except (
-            ConflictError,
-            ConstraintError,
-            ValidationError,
-            NotFoundError,
-            TerminalOrderError,
+        ConflictError,
+        ConstraintError,
+        ValidationError,
+        NotFoundError,
+        TerminalOrderError,
     ) as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 
 
 @tool
-def cancel_order_tool(*, order_id: str, hard_delete: bool = False) -> Dict[str, Any]:
+def cancel_order_tool(*, order_id: str, hard_delete: bool = False) -> dict[str, Any]:
     """Cancel order."""
     try:
         order = cancel_order(order_id, hard_delete=hard_delete)
@@ -139,7 +136,7 @@ def cancel_order_tool(*, order_id: str, hard_delete: bool = False) -> Dict[str, 
 
 
 @tool
-def mark_paid_tool(*, order_id: str) -> Dict[str, Any]:
+def mark_paid_tool(*, order_id: str) -> dict[str, Any]:
     """Mark order paid."""
     try:
         order = mark_order_paid(order_id)
@@ -149,7 +146,7 @@ def mark_paid_tool(*, order_id: str) -> Dict[str, Any]:
 
 
 @tool
-def deliver_order_tool(*, order_id: str, locker_code: str) -> Dict[str, Any]:
+def deliver_order_tool(*, order_id: str, locker_code: str) -> dict[str, Any]:
     """Deliver order with locker_code."""
     try:
         order = deliver_order(order_id, locker_code=locker_code)
@@ -159,7 +156,7 @@ def deliver_order_tool(*, order_id: str, locker_code: str) -> Dict[str, Any]:
 
 
 @tool
-def finish_order_tool(*, order_id: str) -> Dict[str, Any]:
+def finish_order_tool(*, order_id: str) -> dict[str, Any]:
     """Finish order."""
     try:
         order = finish_order(order_id)
@@ -170,12 +167,12 @@ def finish_order_tool(*, order_id: str) -> Dict[str, Any]:
 
 @tool
 def suggest_time_slots_tool(
-        *,
-        sku: str,
-        expected_start_at: str,
-        expected_end_at: str | None = None,
-        window_days: int = 3,
-) -> Dict[str, Any]:
+    *,
+    sku: str,
+    expected_start_at: str,
+    expected_end_at: str | None = None,
+    window_days: int = 3,
+) -> dict[str, Any]:
     """Suggest available rental time slots around an expected time window."""
     try:
         text = suggest_time_slots_text(
@@ -190,7 +187,7 @@ def suggest_time_slots_tool(
 
 
 @tool
-def rag_rules_tool(*, question: str) -> Dict[str, Any]:
+def rag_rules_tool(*, question: str) -> dict[str, Any]:
     """基于本地规则文件回答客户的规则/流程/计费/押金等问题。如果返回了正在初始化，则直接回复让客户稍后再试。"""
     if not rules_rag.ready:
         return {"result": "规则库正在初始化，请稍后再试。"}

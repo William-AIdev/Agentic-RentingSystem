@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import BigInteger, DateTime, Integer, String, text
 from sqlalchemy.dialects.postgresql import ENUM, TSTZRANGE
@@ -46,7 +45,7 @@ class OrderModel(Base):
         nullable=False,
         server_default=text("'reserved'::order_status"),
     )
-    locker_code: Mapped[Optional[str]] = mapped_column(
+    locker_code: Mapped[str | None] = mapped_column(
         String, nullable=True, server_default=text("''")
     )
     created_at: Mapped[datetime] = mapped_column(

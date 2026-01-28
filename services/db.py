@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator, Optional
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session, sessionmaker
 _DEFAULT_PORT = 5432
 _DEFAULT_POOL_SIZE = 5
 
-_ENGINE: Optional[Engine] = None
-_SESSION_FACTORY: Optional[sessionmaker[Session]] = None
+_ENGINE: Engine | None = None
+_SESSION_FACTORY: sessionmaker[Session] | None = None
 
 
 def _build_conninfo() -> str:
@@ -63,7 +63,7 @@ def _get_session_factory() -> sessionmaker[Session]:
 
 
 @contextmanager
-def get_session(existing: Optional[Session] = None) -> Iterator[Session]:
+def get_session(existing: Session | None = None) -> Iterator[Session]:
     if existing is not None:
         yield existing
         return
