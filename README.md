@@ -22,7 +22,7 @@
    ```bash
    docker compose up --build
    ```
-   （因为需要下载近4GB的模型与依赖，第一次构建可能需要5分钟，取决于网络速度）
+   （因为需要下载近4GB的模型与依赖，第一次构建可能需要几分钟，取决于网络速度）
     如果是开发环境：
     ```bash
     docker compose --profile dev up --build
