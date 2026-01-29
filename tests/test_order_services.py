@@ -45,8 +45,23 @@ def _sample_times() -> tuple[datetime, datetime]:
     return start, start + timedelta(hours=2)
 
 
-def test_add_and_get_order_roundtrip(db_session):
-    client = db_session
+def _get_order_in_new_session(order_id: str, engine):
+    from sqlalchemy.orm import sessionmaker
+
+    SessionLocal = sessionmaker(
+        bind=engine,
+        expire_on_commit=False,
+        autoflush=False,
+        future=True,
+    )
+    session = SessionLocal()
+    try:
+        return svc.get_order_detail(order_id, client=session)
+    finally:
+        session.close()
+
+
+def test_add_and_get_order_roundtrip(db_session, engine):
     start, end = _sample_times()
     sku = _new_sku()
     order_id = _new_order_id()
@@ -57,9 +72,8 @@ def test_add_and_get_order_roundtrip(db_session):
         sku=sku,
         start_at=start,
         end_at=end,
-        client=client,
     )
-    fetched = svc.get_order_detail(order_id, client=client)
+    fetched = _get_order_in_new_session(order_id, engine)
     assert created_order.order_id == order_id
     assert fetched.order_id == order_id
     assert fetched.status == OrderStatus.RESERVED.value
@@ -68,7 +82,6 @@ def test_add_and_get_order_roundtrip(db_session):
 
 
 def test_add_order_invalid_time_raises(db_session):
-    client = db_session
     start = datetime.now(UTC)
     sku = _new_sku()
     order_id = _new_order_id()
@@ -80,12 +93,10 @@ def test_add_order_invalid_time_raises(db_session):
             sku=sku,
             start_at=start,
             end_at=start - timedelta(hours=1),
-            client=client,
         )
 
 
 def test_add_order_duplicate_id_conflict(db_session):
-    client = db_session
     start, end = _sample_times()
     sku = _new_sku()
     order_id = _new_order_id()
@@ -96,7 +107,6 @@ def test_add_order_duplicate_id_conflict(db_session):
         sku=sku,
         start_at=start,
         end_at=end,
-        client=client,
     )
     with pytest.raises(ConflictError):
         svc.add_order_to_db(
@@ -106,12 +116,10 @@ def test_add_order_duplicate_id_conflict(db_session):
             sku=sku,
             start_at=start + timedelta(hours=4),
             end_at=end + timedelta(hours=4),
-            client=client,
         )
 
 
 def test_add_order_overlap_conflict(db_session):
-    client = db_session
     start, end = _sample_times()
     sku = _new_sku()
     svc.add_order_to_db(
@@ -121,7 +129,6 @@ def test_add_order_overlap_conflict(db_session):
         sku=sku,
         start_at=start,
         end_at=end,
-        client=client,
     )
     with pytest.raises(ConflictError):
         svc.add_order_to_db(
@@ -131,12 +138,10 @@ def test_add_order_overlap_conflict(db_session):
             sku=sku,
             start_at=start + timedelta(minutes=30),
             end_at=end + timedelta(minutes=30),
-            client=client,
         )
 
 
-def test_edit_order_updates_time_and_fields(db_session):
-    client = db_session
+def test_edit_order_updates_time_and_fields(db_session, engine):
     start, end = _sample_times()
     sku = _new_sku()
     order_id = _new_order_id()
@@ -147,22 +152,20 @@ def test_edit_order_updates_time_and_fields(db_session):
         sku=sku,
         start_at=start,
         end_at=end,
-        client=client,
     )
     new_start = start + timedelta(days=1)
     new_end = new_start + timedelta(hours=3)
-    updated = svc.edit_order_from_db(
+    svc.edit_order_from_db(
         order_id,
         patch={"start_at": new_start, "end_at": new_end, "status": OrderStatus.PAID.value},
-        client=client,
     )
+    updated = _get_order_in_new_session(order_id, engine)
     assert updated.start_at_iso == _naive_to_utc(new_start)
     assert updated.end_at_iso == _naive_to_utc(new_end)
     assert updated.status == OrderStatus.PAID.value
 
 
 def test_edit_order_empty_patch_raises(db_session):
-    client = db_session
     start, end = _sample_times()
     order_id = _new_order_id()
     svc.add_order_to_db(
@@ -172,14 +175,12 @@ def test_edit_order_empty_patch_raises(db_session):
         sku=_new_sku(),
         start_at=start,
         end_at=end,
-        client=client,
     )
     with pytest.raises(ValidationError):
-        svc.edit_order_from_db(order_id, patch={}, client=client)
+        svc.edit_order_from_db(order_id, patch={})
 
 
 def test_terminal_order_rejects_edits(db_session):
-    client = db_session
     start, end = _sample_times()
     sku = _new_sku()
     order_id = _new_order_id()
@@ -190,15 +191,13 @@ def test_terminal_order_rejects_edits(db_session):
         sku=sku,
         start_at=start,
         end_at=end,
-        client=client,
     )
-    svc.finish_order(order_id, client=client)
+    svc.finish_order(order_id)
     with pytest.raises(TerminalOrderError):
-        svc.edit_order_from_db(order_id, patch={"status": OrderStatus.PAID.value}, client=client)
+        svc.edit_order_from_db(order_id, patch={"status": OrderStatus.PAID.value})
 
 
-def test_cancel_soft_and_hard_delete(db_session):
-    client = db_session
+def test_cancel_soft_and_hard_delete(db_session, engine):
     start, end = _sample_times()
     sku1 = _new_sku()
     order_id1 = _new_order_id()
@@ -209,9 +208,8 @@ def test_cancel_soft_and_hard_delete(db_session):
         sku=sku1,
         start_at=start,
         end_at=end,
-        client=client,
     )
-    soft = svc.cancel_order(order_id1, client=client)
+    soft = svc.cancel_order(order_id1)
     assert soft.status == OrderStatus.CANCELED.value
 
     sku2 = _new_sku()
@@ -223,16 +221,14 @@ def test_cancel_soft_and_hard_delete(db_session):
         sku=sku2,
         start_at=start,
         end_at=end,
-        client=client,
     )
-    deleted = svc.cancel_order(order_id2, client=client, hard_delete=True)
+    deleted = svc.cancel_order(order_id2, hard_delete=True)
     assert deleted.order_id == order_id2
     with pytest.raises(NotFoundError):
-        svc.get_order_detail(order_id2, client=client)
+        _get_order_in_new_session(order_id2, engine)
 
 
-def test_mark_paid_and_deliver_and_finish(db_session):
-    client = db_session
+def test_mark_paid_and_deliver_and_finish(db_session, engine):
     start, end = _sample_times()
     sku = _new_sku()
     order_id = _new_order_id()
@@ -243,25 +239,26 @@ def test_mark_paid_and_deliver_and_finish(db_session):
         sku=sku,
         start_at=start,
         end_at=end,
-        client=client,
     )
 
-    paid = svc.mark_order_paid(order_id, client=client)
+    svc.mark_order_paid(order_id)
+    paid = _get_order_in_new_session(order_id, engine)
     assert paid.status == OrderStatus.PAID.value
 
     with pytest.raises(ValidationError):
-        svc.deliver_order(order_id, locker_code="", client=client)
+        svc.deliver_order(order_id, locker_code="")
 
-    shipped = svc.deliver_order(order_id, locker_code="LC123", client=client)
+    svc.deliver_order(order_id, locker_code="LC123")
+    shipped = _get_order_in_new_session(order_id, engine)
     assert shipped.status == OrderStatus.SHIPPED.value
     assert shipped.locker_code == "LC123"
 
-    finished = svc.finish_order(order_id, client=client)
+    svc.finish_order(order_id)
+    finished = _get_order_in_new_session(order_id, engine)
     assert finished.status == OrderStatus.SUCCESSFUL.value
 
 
 def test_suggest_time_slots_text(db_session):
-    client = db_session
     sku = "white_s"
     window_days = 5
 
@@ -284,7 +281,6 @@ def test_suggest_time_slots_text(db_session):
         sku=sku,
         start_at=res_expected_start,
         end_at=res_expected_end,
-        client=client,
     )
 
     svc.add_order_to_db(
@@ -294,7 +290,6 @@ def test_suggest_time_slots_text(db_session):
         sku=sku,
         start_at=res_expected_start_2,
         end_at=res_expected_end_2,
-        client=client,
     )
 
     # Ask for suggestions around the expected window.
@@ -302,7 +297,6 @@ def test_suggest_time_slots_text(db_session):
         sku=sku,
         expected_start_at=expected_start,
         expected_end_at=expected_end,
-        client=client,
         window_days=window_days,
     )
 

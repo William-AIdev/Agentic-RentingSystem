@@ -31,9 +31,10 @@
 ## Happy Path（示例流程）
 
 1. 规则查询（RAG）
-   ```
-   我想了解押金和清洗规则
-   ```
+   例如：
+   - 我想了解押金和清洗规则
+   - 怎么租衣服
+   - 怎么还衣服
 
 2. 创建订单（本地时区默认 Sydney,sku代表商品颜色和型号，命名格式为[BLACK, WHITE]_[S,M,L]）
    ```
@@ -86,10 +87,6 @@
 
 ## 开发检查工具（可选）
 
-- Ruff：
-  ```bash
-  ruff check .
-  ```
 - Black：
   ```bash
   black .
@@ -97,6 +94,10 @@
 - mypy：
   ```bash
   mypy --explicit-package-bases .
+  ```
+  - Ruff：
+  ```bash
+  ruff check .
   ```
 
 ## 常见问题

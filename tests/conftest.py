@@ -29,6 +29,7 @@ def postgres_container():
 def _init_db(postgres_container):
     import os
     from pathlib import Path
+
     from sqlalchemy.engine.url import make_url
 
     os.environ["DATABASE_URL"] = postgres_container.get_connection_url()
@@ -58,15 +59,15 @@ def _init_db(postgres_container):
     _psql_exec(catalog_sql)
 
 
+@pytest.fixture(scope="session")
+def engine(_init_db):
+    return get_engine()
+
+
 @pytest.fixture()
-def db_session(_init_db):
-    import os
-    os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL", "")
-    engine = get_engine()
-    connection = engine.connect()
-    transaction = connection.begin()
+def db_session(engine):
     SessionLocal = sessionmaker(
-        bind=connection,
+        bind=engine,
         expire_on_commit=False,
         autoflush=False,
         future=True,
@@ -76,5 +77,5 @@ def db_session(_init_db):
         yield session
     finally:
         session.close()
-        transaction.rollback()
-        connection.close()
+        with engine.begin() as conn:
+            conn.exec_driver_sql("TRUNCATE orders RESTART IDENTITY CASCADE")

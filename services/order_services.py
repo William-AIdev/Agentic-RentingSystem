@@ -234,7 +234,10 @@ def add_order_to_db(
         try:
             with _session_tx(session):
                 session.add(order)
+                session.flush()
+            session.refresh(order)
         except IntegrityError as exc:
+            session.rollback()
             orig = getattr(exc, "orig", None)
             if isinstance(orig, pg_errors.ExclusionViolation):
                 raise ConflictError(f"Order insert conflicted: {orig}", sku=sku) from exc
@@ -244,9 +247,9 @@ def add_order_to_db(
                 raise ConstraintError(f"Failed to insert order: {orig}") from exc
             raise ConstraintError(f"Failed to insert order: {exc}") from exc
         except SQLAlchemyError as exc:
+            session.rollback()
             raise ConstraintError(f"Failed to insert order: {exc}") from exc
 
-        session.refresh(order)
         return _model_to_order(order)
 
 
@@ -265,42 +268,43 @@ def edit_order_from_db(
         raise ValidationError("Patch cannot be empty")
 
     with get_session(client) as session:
-        existing = _get_data_from_db(order_id, session)
-        if not existing:
-            raise NotFoundError(f"Order {order_id} not found")
-        if existing.status in TERMINAL_STATUSES:
-            raise TerminalOrderError(f"Order {order_id} is terminal and cannot be modified")
-
-        if "start_at" in patch or "end_at" in patch:
-            new_start = _iso_to_dt_utc(patch.get("start_at", existing.start_at))
-            new_end = _iso_to_dt_utc(patch.get("end_at", existing.end_at))
-            _validate_time_range(new_start, new_end)
-            patch["start_at"] = new_start
-            patch["end_at"] = new_end
-        if "sku" in patch and patch["sku"] is not None:
-            patch["sku"] = str(patch["sku"]).strip().upper()
-
-        for key in ("created_at", "updated_at"):
-            patch.pop(key, None)
-
-        if not patch:
-            raise ValidationError("Patch cannot be empty")
-
         try:
             with _session_tx(session):
+                existing = _get_data_from_db(order_id, session)
+                if not existing:
+                    raise NotFoundError(f"Order {order_id} not found")
+                if existing.status in TERMINAL_STATUSES:
+                    raise TerminalOrderError(f"Order {order_id} is terminal and cannot be modified")
+
+                if "start_at" in patch or "end_at" in patch:
+                    new_start = _iso_to_dt_utc(patch.get("start_at", existing.start_at))
+                    new_end = _iso_to_dt_utc(patch.get("end_at", existing.end_at))
+                    _validate_time_range(new_start, new_end)
+                    patch["start_at"] = new_start
+                    patch["end_at"] = new_end
+                if "sku" in patch and patch["sku"] is not None:
+                    patch["sku"] = str(patch["sku"]).strip().upper()
+
+                for key in ("created_at", "updated_at"):
+                    patch.pop(key, None)
+
+                if not patch:
+                    raise ValidationError("Patch cannot be empty")
+
                 for key, value in patch.items():
                     setattr(existing, key, value)
+
+                session.flush()
         except IntegrityError as exc:
+            session.rollback()
             orig = getattr(exc, "orig", None)
             if isinstance(orig, pg_errors.ExclusionViolation):
-                raise ConflictError(
-                    f"Order update conflicted: {orig}",
-                    sku=existing.sku,
-                ) from exc
+                raise ConflictError(f"Order update conflicted: {orig}") from exc
             if isinstance(orig, pg_errors.CheckViolation):
                 raise ConstraintError(f"Failed to update order: {orig}") from exc
             raise ConstraintError(f"Failed to update order: {exc}") from exc
         except SQLAlchemyError as exc:
+            session.rollback()
             raise ConstraintError(f"Failed to update order: {exc}") from exc
 
         session.refresh(existing)
@@ -319,11 +323,13 @@ def cancel_order(
     """
     with get_session(client) as session:
         if hard_delete:
-            existing = _get_data_from_db(order_id, session)
-            if not existing:
-                raise NotFoundError(f"Order {order_id} not found for delete")
             with _session_tx(session):
+                existing = _get_data_from_db(order_id, session)
+                if not existing:
+                    raise NotFoundError(f"Order {order_id} not found for delete")
                 session.delete(existing)
+                session.flush()
+            session.expunge(existing)
             return _model_to_order(existing)
         return edit_order_from_db(
             order_id, patch={"status": OrderStatus.CANCELED.value}, client=session
