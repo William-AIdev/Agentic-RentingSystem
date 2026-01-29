@@ -9,9 +9,7 @@ services:
     command:
       [
         "watchfiles",
-        "python",
-        "-m",
-        "app.main",
+        "python -m app.main",
         "/app/app",
         "/app/services",
         "/app/requirements.txt",

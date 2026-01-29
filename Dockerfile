@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # ---------- deps: dev ----------
 FROM base AS deps-dev
-COPY requirements.txt requirements-dev.txt ./
+COPY requirements.txt requirements-dev.txt requirements-test.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-dev.txt
 
