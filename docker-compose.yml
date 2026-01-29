@@ -26,9 +26,19 @@ services:
       - qdrant
     ports:
       - "7860:7860"
-    # command: ["python", "-m", "app.main"]
+    command: ["python", "-m", "app.main"]
+    volumes:
+      - hf_cache:/opt/hf # cache huggingface models
 
-    # for development with auto-reload
+  app-dev:
+    profiles: ["dev"]
+    build: .
+    env_file: .env
+    depends_on:
+      - db
+      - qdrant
+    ports:
+      - "7860:7860"
     command:
       [
         "watchfiles",
