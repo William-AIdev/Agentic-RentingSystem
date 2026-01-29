@@ -19,7 +19,9 @@ services:
       - qdrant_data:/qdrant/storage
 
   app:
-    build: .
+    build:
+      context: .
+      target: prod
     env_file: .env
     depends_on:
       - db
@@ -28,31 +30,7 @@ services:
       - "7860:7860"
     command: ["python", "-m", "app.main"]
     volumes:
-      - hf_cache:/opt/hf # cache huggingface models
-
-  app-dev:
-    profiles: ["dev"]
-    build: .
-    env_file: .env
-    depends_on:
-      - db
-      - qdrant
-    ports:
-      - "7860:7860"
-    command:
-      [
-        "watchfiles",
-        "python -m app.main",
-        "/app/agent",
-        "/app/app",
-        "/app/services",
-        "/app/Dockerfile",
-        "/app/docker-compose.yml",
-        "/app/requirements.txt",
-      ]
-    volumes:
-      - ./:/app # for development
-      - hf_cache:/opt/hf # cache huggingface models
+      - hf_cache:/opt/hf
 
 volumes:
   pgdata:

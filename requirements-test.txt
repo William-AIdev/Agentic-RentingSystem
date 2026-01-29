@@ -1,3 +1,4 @@
+# For testing and GitHub Actions
 pytest>=8.0.0
 testcontainers[postgresql]>=4.6.0
 python-dotenv>=1.0.0

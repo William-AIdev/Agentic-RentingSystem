@@ -1,0 +1,4 @@
+-r requirements.txt
+-r requirements-test.txt
+black>=24.0.0
+mypy>=1.10.0

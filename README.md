@@ -23,10 +23,10 @@
    docker compose up --build
    ```
    （因为需要下载近4GB的模型与依赖，第一次构建可能需要几分钟，取决于网络速度）
-    如果是开发环境：
-    ```bash
-    docker compose --profile dev up --build
-    ```
+   如果是开发环境：
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+   ```
 
 3. 打开浏览器：
    ```
@@ -58,7 +58,7 @@
 
 5. 发货（需要 locker_code）
    ```
-   发货，订单号为 <order_id>，取件码 LC123
+   发货，订单号为 <order_id>，取件码 LC123(可使用其他)
    ```
 
 6. 完成订单

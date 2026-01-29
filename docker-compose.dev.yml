@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      target: dev
+    volumes:
+      - ./:/app
+      - hf_cache:/opt/hf
+    command:
+      [
+        "watchfiles",
+        "python",
+        "-m",
+        "app.main",
+        "/app/app",
+        "/app/services",
+        "/app/requirements.txt",
+        "/app/requirements-dev.txt"
+      ]
