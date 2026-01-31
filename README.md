@@ -4,13 +4,12 @@
 
 <!-- Tech Stacks -->
 ![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&style=flat-square)
-![LangChain](https://img.shields.io/badge/LangChain-RAG_Framework-0FA958?style=flat-square)
+![LangGraph](https://img.shields.io/badge/LangGraph-Framework-FF6F61?style=flat-square)
 ![OpenAI](https://img.shields.io/badge/OpenAI-LLM-412991?logo=openai&style=flat-square)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-DB-336791?logo=postgresql&style=flat-square)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-red?style=flat-square)
+![Qdrant](https://img.shields.io/badge/Qdrant-Vector_DB-DC244C?logo=qdrant&style=flat-square)
 ![Docker](https://img.shields.io/badge/Docker-Container-2496ED?logo=docker&style=flat-square)
-
-
 
 A production-minded rental-agent, based on real personal rental business.
 User can interact with the agent to speed up rental order processing, 
