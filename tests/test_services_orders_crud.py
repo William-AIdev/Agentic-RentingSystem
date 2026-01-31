@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from services import order_services as svc
+from services.order_services import order_to_dict, order_to_json
 from services.order_types import NotFoundError, OrderStatus, ValidationError
 
 UTC_TZ = UTC
@@ -75,6 +76,26 @@ def test_add_and_get_order_roundtrip(db_session, engine):
     expected_end = _naive_to_utc(end)
     assert fetched.start_at_iso.timestamp() == expected_start.timestamp()
     assert fetched.end_at_iso.timestamp() == expected_end.timestamp()
+
+
+def test_order_json_serialization(db_session):
+    start, end = _sample_times()
+    order = svc.add_order_to_db(
+        order_id=_new_order_id(),
+        user_name="Json",
+        user_wechat="wx_json",
+        sku=_new_sku(),
+        start_at=start,
+        end_at=end,
+    )
+
+    payload = order_to_dict(order)
+    assert payload["order_id"] == order.order_id
+    assert isinstance(payload["start_at"], str)
+    assert isinstance(payload["end_at"], str)
+
+    json_text = order_to_json(order)
+    assert "\"order_id\"" in json_text
 
 
 def test_edit_order_updates_time_and_fields(db_session, engine):

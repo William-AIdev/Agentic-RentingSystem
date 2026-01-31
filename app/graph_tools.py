@@ -18,7 +18,8 @@ from services.order_services import (
     finish_order,
     get_order_detail,
     mark_order_paid,
-    order_to_text,
+    order_to_dict,
+    order_to_json,
     suggest_time_slots_text,
 )
 from services.order_types import (
@@ -103,7 +104,7 @@ def get_order_tool(*, order_id: str) -> dict[str, Any]:
     """Get order detail."""
     try:
         order = get_order_detail(order_id)
-        return {"result": order_to_text(order, tz=LOCAL_TZ)}
+        return {"result": order_to_dict(order, tz=LOCAL_TZ)}
     except NotFoundError as exc:
         return {"error": f"{exc.__class__.__name__}: {exc}"}
 

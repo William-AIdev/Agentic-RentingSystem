@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
+import json
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 
@@ -372,25 +373,30 @@ def get_order_detail(order_id: str, *, client: Session | None = None) -> Order:
     return _model_to_order(row)
 
 
-def order_to_text(order: Order, *, tz: tzinfo = UTC_TZ) -> str:
-    """Convert Order dataclass to human-readable text."""
+def order_to_dict(order: Order, *, tz: tzinfo = UTC_TZ) -> dict[str, object]:
+    """Convert Order dataclass to JSON-serializable dict."""
 
     def _fmt(dt: datetime) -> str:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=UTC_TZ)
         return dt.astimezone(tz).isoformat()
 
-    lines = [
-        f"Order ID: {order.order_id}",
-        f"User Name: {order.user_name}",
-        f"WeChat: {order.user_wechat}",
-        f"SKU: {order.sku}",
-        f"Start At: {_fmt(order.start_at_iso)}",
-        f"End At: {_fmt(order.end_at_iso)}",
-        f"Buffer Hours: {order.buffer_hours}",
-        f"Status: {order.status}",
-        f"Locker Code: {order.locker_code or 'N/A'}",
-        f"Created At: {_fmt(order.created_at)}",
-        f"Updated At: {_fmt(order.updated_at)}",
-    ]
-    return "\n".join(lines)
+    return {
+        "order_id": order.order_id,
+        "user_name": order.user_name,
+        "user_wechat": order.user_wechat,
+        "sku": order.sku,
+        "start_at": _fmt(order.start_at_iso),
+        "end_at": _fmt(order.end_at_iso),
+        "buffer_hours": order.buffer_hours,
+        "status": order.status,
+        "locker_code": order.locker_code,
+        "created_at": _fmt(order.created_at),
+        "updated_at": _fmt(order.updated_at),
+    }
+
+
+def order_to_json(order: Order, *, tz: tzinfo = UTC_TZ) -> str:
+    """Convert Order dataclass to JSON string."""
+    payload = order_to_dict(order, tz=tz)
+    return json.dumps(payload, ensure_ascii=True)
