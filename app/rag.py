@@ -65,7 +65,7 @@ class RulesRAG:
             rules_path = Path(settings.rules_path)
             rules_text = self._read_rules_text(rules_path)
             if not rules_text:
-                self._error = "RAG file is empty. Please Check rules_path setting."
+                self._error = "规则文件为空或不存在。"
                 self._ready.set()
                 return
 
@@ -101,7 +101,7 @@ class RulesRAG:
 
             docs = self._split_rule_text(rules_text)
             if not docs:
-                self._error = "RAG file is empty. Please Check rules_path setting."
+                self._error = "规则文件为空或不存在。"
                 self._ready.set()
                 return
 
