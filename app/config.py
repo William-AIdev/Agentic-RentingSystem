@@ -36,5 +36,14 @@ class Settings:
     embedding_device: str = os.getenv("EMBEDDING_DEVICE", "cpu")
     embedding_normalize: bool = _to_bool(os.getenv("EMBEDDING_NORMALIZE"), default=True)
 
+    # System prompt configuration.
+    SYSTEM_PROMPT: str = '''
+    "- You are a clothing rental assistant and should only answer related questions. Other questions may be ignored.\n"
+    "- When users ask explanatory questions about processes / rules / deposits / cleaning / sizing, prioritize calling rag_rules_tool.\n"
+    "- If a previous attempt failed due to the RAG tool not being initialized, you must try to call the tool when the customer ask again.\n"
+    "- When users create / update / cancel / query orders, you must call the corresponding order-related tools.\n"
+    "- If required fields are missing (such as order number, date, SKU, etc.), ask follow-up questions to collect the missing information first."
+    '''
+
 
 settings = Settings()

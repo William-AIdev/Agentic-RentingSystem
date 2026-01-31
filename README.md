@@ -1,111 +1,119 @@
 # Rental Agent (Gradio + LangGraph)
 
-面向衣物租赁场景的本地 Web 应用，支持订单管理、规则问答（RAG）、时间档期建议与可视化对话。
+A local web app for a clothing rental scenario. It supports order management, rules Q&A (RAG), time-slot suggestions, and a visual chat interface.
 
-## 功能概览
+## Features
 
-- 订单全流程：创建/查询/更新/取消/支付/发货/完成
-- 规则问答：基于本地规则文件检索回答
-- 时间建议：基于库存占用推荐可租时间段
-- 可配置时区：默认 Australia/Sydney
-- Docker 一键启动：Postgres + Qdrant + App
+- Full order flow: create / query / update / cancel / pay / ship / complete
+- Rules Q&A: retrieval over local rules file
+- Time suggestions: recommend available rental slots based on inventory occupancy
+- Configurable timezone: default `Australia/Sydney`
+- One-command Docker startup: Postgres + Qdrant + App
 
-## 快速开始（Docker）
+## Quick Start (Docker)
 
-1. 复制并配置环境变量：
+1. Copy and configure environment variables:
    ```bash
    cp .env.example .env
    ```
-   至少填写 `OPENAI_API_KEY`。
+   Fill at least `OPENAI_API_KEY`.
 
-2. 启动服务：
+2. Start services:
+
+   For production:
    ```bash
    docker compose up --build
    ```
-   （因为需要下载近4GB的模型与依赖，第一次构建可能需要几分钟，取决于网络速度）
-   如果是开发环境：
+   (First build may take a few minutes because it downloads ~4GB of models and dependencies.)
+
+   For development:
    ```bash
    docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
    ```
 
-3. 打开浏览器：
+3. Open in browser:
    ```
    http://localhost:7860
    ```
 
-## Happy Path（示例流程）
+## Happy Path (Sample Flow)
 
-1. 规则查询（RAG）
-   例如：
-   - 我想了解押金和清洗规则
-   - 怎么租衣服
-   - 怎么还衣服
+1. Rules query (RAG)
+   Examples:
+   - I want to know the deposit and cleaning rules
+   - How do I rent clothes
+   - How do I return clothes
 
-2. 创建订单（本地时区默认 Sydney,sku代表商品颜色和型号，命名格式为[BLACK, WHITE]_[S,M,L]）
+2. Create an order (local timezone defaults to Sydney; SKU is color + size, format `[BLACK, WHITE]_[S,M,L]`)
    ```
-   创建订单，用户张三，微信 zhangsan，SKU black_l，开始 2026-01-29 08:00，结束 2026-01-30 20:00
-   ```
-
-3. 查询订单
-   ```
-   查询订单，订单号为 <order_id>
+   Create order, user William, wechat willychat, SKU black_l, start 2026-01-29 08:00, end 2026-01-30 20:00
    ```
 
-4. 标记已支付
+3. Query an order
    ```
-   标记订单已支付，订单号为 <order_id>
-   ```
-
-5. 发货（需要 locker_code）
-   ```
-   发货，订单号为 <order_id>，取件码 LC123(可使用其他)
+   Query order <order_id>
    ```
 
-6. 完成订单
+4. Mark as paid
    ```
-   完成订单，订单号为 <order_id>
-   ```
-
-7. 取消订单（可选）
-   ```
-   取消订单，订单号为 <order_id>
+   Mark order paid <order_id>
    ```
 
-## 目录结构
+5. Ship (locker_code required)
+   ```
+   Ship order <order_id>, locker code is LC123 (can be any)
+   ```
 
-- `app/`：Gradio UI + LangGraph agent
-- `services/`：订单服务层（SQLAlchemy ORM）
-- `db/init/`：数据库初始化与约束
-- `agent/rules/`：规则文档（RAG 语料）
-- `scripts/`：脚本（如 LLM 延迟测试）
+6. Complete order
+   ```
+   Complete order <order_id>
+   ```
 
-## 配置说明
+7. Cancel order (optional)
+   ```
+   Cancel order <order_id>
+   ```
 
-所有配置集中在 `.env`，关键项：
+## Project Structure
 
-- `OPENAI_API_KEY`：LLM 访问密钥
-- `OPENAI_MODEL`：模型名（默认 `gpt-5-nano`）
-- `OPENAI_TEMPERATURE`：采样温度（默认 `1`）
-- `LOCAL_TIMEZONE`：用户输入/输出时区（默认 `Australia/Sydney`）
-- `QDRANT_URL`：向量库地址
-- `RULES_PATH`：规则文件路径
+- `app/`: Gradio UI + RAG logic + LangGraph agent (graph and node initialization, tool definition)
+- `services/`: order service layer (SQLAlchemy ORM, business logic)
+- `db/init/`: database initialization and constraints
+- `agent/rules/`: rule documents (RAG text)
+- `scripts/`: scripts (e.g., auto_lint tool)
+- `tests/`: unit tests
+- `workflows/`: GitHub Actions workflows
+- 
 
-## 开发检查工具（可选）
+## Configuration
 
-- Black：
+All configuration is in `.env`. Key variables:
+
+- `OPENAI_API_KEY`: LLM access key
+- `OPENAI_MODEL`: model name (default `gpt-5-nano`)
+- `OPENAI_TEMPERATURE`: sampling temperature (default `1`)
+- `LOCAL_TIMEZONE`: user input/output timezone (default `Australia/Sydney`)
+- `QDRANT_URL`: vector store URL
+- `RULES_PATH`: rules file path
+
+## Dev Tools (Optional)
+
+- Black:
   ```bash
   black .
   ```
-- mypy：
+- mypy:
   ```bash
   mypy --explicit-package-bases .
   ```
-  - Ruff：
+- Ruff:
   ```bash
   ruff check .
   ```
 
-## 常见问题
+## FAQ
 
-- **时区问题**：用户输入/输出默认 Sydney，可通过 `LOCAL_TIMEZONE` 调整。
-- **RAG 未就绪**：规则文件缺失或初始化失败会返回提示。
+- **Timezone**: user input/output defaults to Sydney; change with `LOCAL_TIMEZONE`.
+- **RAG not ready**: missing rules file or initialization failure returns a warning.
+- **RAG init**: ensure you deleted previous Qdrant collection if rules file changed.
+Use `docker compose down -v` to remove volumes or only delete qdrant_data volume and qdrant-1 container(faster).

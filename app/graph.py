@@ -12,14 +12,6 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from app.config import settings
 from app.graph_tools import TOOLS
 
-SYSTEM_PROMPT = (
-    "你是衣物租赁助手，只需回答相关问题，其它问题可忽略。\n"
-    "- 用户问流程/规则/押金/清洗/尺码等解释性问题时，优先调用 rag_rules_tool。"
-    "若之前因为未初始化而回答失败，而客户再次尝试询问，则你需要再次尝试调用该工具，而不是拒绝客户\n"
-    "- 用户创建/更新/取消/查询订单等操作时，必须调用相应订单工具。\n"
-    "- 如果缺少必要字段（例如订单号、时间、SKU 等），先追问补齐。"
-)
-
 
 def _configure_langsmith_tracing() -> None:
     if not os.getenv("LANGSMITH_API_KEY"):
@@ -41,7 +33,7 @@ llm = init_chat_model(
 
 def agent_node(state: MessagesState) -> dict[str, Any]:
     messages = cast(list[BaseMessage], state["messages"])
-    system_messages: list[BaseMessage] = [SystemMessage(content=SYSTEM_PROMPT)]
+    system_messages: list[BaseMessage] = [SystemMessage(content=settings.SYSTEM_PROMPT)]
     response = llm.invoke(system_messages + messages)
     return {"messages": [response]}
 

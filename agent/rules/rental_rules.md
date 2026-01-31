@@ -1,143 +1,152 @@
-# 1. 租赁整体流程概览
+# 1. Overview of the Rental Process
 
-衣物租赁通常分为以下几个步骤：
+Clothing rental generally consists of the following steps:
 
-1. 咨询与选择款式
-2. 确认尺码与租赁日期
-3. 创建预订（库存预留）
-4. 确认订单
-5. 取衣
-6. 归还衣物
+1. Consultation and style selection
+2. Size and rental date confirmation
+3. Reservation creation (inventory hold)
+4. Order confirmation
+5. Item pickup
+6. Item return
 
-客服可根据客户所处阶段，重点解释对应步骤。
-
----
-
-# 2. 咨询与选择款式
-
-客户可以向客服咨询以下内容：
-- 可租赁的衣物类型（如礼服、西装、毕业袍等）
-- 款式风格、颜色、适合场合
-- 是否适合特定身高或体型
-
-**说明要点：**
-- 客服可提供款式建议和搭配建议
-- 实时库存情况需以系统查询结果为准
+Customer service staff can focus on explaining the relevant step based on the customer’s current stage.
 
 ---
 
-# 3. 尺码确认说明
+# 2. Consultation and Style Selection
 
-在确认租赁前，客户需要确定合适的尺码。
+Customers may consult customer service about the following:
 
-**常见说明方式：**
-- 参考尺码表选择
-- 根据身高、体重进行推荐
-- 尺码存在轻微弹性或调节空间
+* Types of clothing available for rent (e.g., gowns, suits, graduation robes, etc.)
+* Style, color, and suitable occasions
+* Suitability for specific heights or body types
 
-**注意：**
-- 不同款式版型可能略有差异
-- 若介于两个尺码之间，客服可建议更稳妥的选项
+**Key points to explain:**
 
----
-
-# 4. 租赁日期与使用周期
-
-## 4.1 租赁日期的定义
-
-- 租赁开始日期：客户取到衣物的日期
-- 租赁结束日期：客户归还衣物的日期
-
-租赁周期按**自然日**计算，通常包含取衣和归还当天。
-
-## 4.2 提前与延后说明
-
-- 可提前预约未来日期的衣物（以系统可用性为准）
-- 若需要延长使用时间，应提前联系客服确认
+* Customer service can provide style and outfit suggestions
+* Real-time inventory availability is subject to system query results
 
 ---
 
-# 5. 预订（库存预留）说明
+# 3. Size Confirmation Guidelines
 
-当客户确认款式、尺码和日期后，系统会为客户创建**预订**。
+Before confirming a rental, customers need to determine the appropriate size.
 
-**预订的含义：**
-- 预订表示系统已为客户暂时保留对应衣物
-- 预订具有**有效期限**，在期限内需完成确认
+**Common explanation methods:**
 
-**重要说明：**
-- 预订并不等同于最终订单
-- 若超过有效期限未确认，预订可能会自动释放
+* Selecting based on a size chart
+* Recommendations based on height and weight
+* Noting that sizes may have slight flexibility or adjustment room
 
-客服在此阶段应清楚告知客户预订有效时间。
+**Notes:**
 
----
-
-# 6. 订单确认说明
-
-在预订有效期内，客户完成确认后，预订将转为正式订单。
-
-**订单确认后：**
-- 对应衣物将在租赁日期内为客户保留
-- 订单信息将记录在系统中
-
-**注意：**
-- 订单一经确认，如需修改日期或取消，请及时联系客服
-- 是否可以修改需根据订单当前状态而定
+* Different styles may have slightly different fits
+* If the customer is between two sizes, customer service can recommend the safer option
 
 ---
 
-# 7. 取衣流程说明
+# 4. Rental Dates and Usage Period
 
-## 7.1 取衣方式
+## 4.1 Definition of Rental Dates
 
-取衣方式可能包括：
-- 到指定地点自取
-- 其他约定方式（以客服说明为准）
+* Rental start date: the date the customer receives the clothing
+* Rental end date: the date the customer returns the clothing
 
-## 7.2 取衣时注意事项
+The rental period is calculated by **calendar days**, usually including both the pickup and return dates.
 
-- 请按约定时间取衣
-- 取衣时可检查衣物外观和完整性
-- 如发现问题，应当场告知客服
+## 4.2 Early Pickup and Extension
 
----
-
-# 8. 归还流程说明
-
-## 8.1 归还时间
-
-- 请在租赁结束日期当天按约定方式归还衣物
-- 提前或准时归还有助于后续租赁安排
-
-## 8.2 归还状态
-
-- 衣物归还后将进入检查流程
-- 确认无异常后，订单状态将更新为完成
+* Clothing can be reserved in advance for future dates (subject to system availability)
+* If an extension is needed, customers should contact customer service in advance for confirmation
 
 ---
 
-# 9. 常见流程相关问题
+# 5. Reservation (Inventory Hold) Explanation
 
-## Q1：如果我还没确认，会不会被别人租走？
-- 在预订有效期内，系统会为您暂时保留衣物
-- 若预订过期未确认，衣物将重新开放
+Once the customer confirms the style, size, and dates, the system will create a **reservation**.
 
-## Q2：我可以修改租赁日期吗？
-- 是否可以修改取决于订单状态和库存情况
-- 建议尽早联系客服协助处理
+**Meaning of a reservation:**
 
-## Q3：如果我临时不用了怎么办？
-- 可在订单确认前或确认后联系客服说明情况
-- 具体处理方式需根据订单状态判断
+* A reservation indicates that the system has temporarily held the selected clothing for the customer
+* Reservations have a **validity period**, during which confirmation must be completed
 
----
+**Important notes:**
 
-# 10. 客服使用提醒（内部）
+* A reservation is not the same as a final order
+* If the reservation expires without confirmation, it may be automatically released
 
-- 本文档用于解释**流程规则**，不用于判断实时库存或价格
-- 涉及“是否有货 / 是否锁定成功”的问题，需以系统工具结果为准
-- 表达时避免使用绝对承诺性语言
+Customer service should clearly inform customers of the reservation’s validity period at this stage.
 
 ---
 
+# 6. Order Confirmation Explanation
+
+Once the customer completes confirmation within the reservation validity period, the reservation will be converted into a formal order.
+
+**After order confirmation:**
+
+* The selected clothing will be reserved for the customer during the rental period
+* Order details will be recorded in the system
+
+**Notes:**
+
+* After confirmation, if changes or cancellation are needed, customers should contact customer service promptly
+* Whether changes are possible depends on the current order status
+
+---
+
+# 7. Pickup Process Explanation
+
+## 7.1 Pickup Methods
+
+Pickup methods may include:
+
+* Self-pickup at a designated location
+* Other agreed-upon methods (subject to customer service guidance)
+
+## 7.2 Notes for Pickup
+
+* Please pick up the clothing at the agreed time
+* Check the item’s appearance and completeness at pickup
+* If any issues are found, inform customer service immediately on the spot
+
+---
+
+# 8. Return Process Explanation
+
+## 8.1 Return Time
+
+* Please return the clothing on the rental end date using the agreed method
+* Early or on-time returns help with subsequent rental arrangements
+
+## 8.2 Return Status
+
+* After return, the clothing will enter an inspection process
+* Once confirmed with no issues, the order status will be updated to completed
+
+---
+
+# 9. Common Process-Related Questions
+
+## Q1: If I haven’t confirmed yet, can someone else rent it?
+
+* During the reservation validity period, the system will temporarily hold the clothing for you
+* If the reservation expires without confirmation, the item will be released and made available again
+
+## Q2: Can I change the rental dates?
+
+* Whether changes are possible depends on the order status and inventory availability
+* It is recommended to contact customer service as early as possible for assistance
+
+## Q3: What if I no longer need it at the last minute?
+
+* You can contact customer service either before or after order confirmation to explain the situation
+* The specific handling depends on the current order status
+
+---
+
+# 10. Customer Service Reminders (Internal)
+
+* This document is used to explain **process rules**, not to determine real-time inventory or pricing
+* Questions involving “availability” or “successful reservation” must be answered based on system tool results
+* Avoid using absolute or guaranteed language when communicating with customers
