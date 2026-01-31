@@ -95,7 +95,7 @@ def test_order_json_serialization(db_session):
     assert isinstance(payload["end_at"], str)
 
     json_text = order_to_json(order)
-    assert "\"order_id\"" in json_text
+    assert '"order_id"' in json_text
 
 
 def test_edit_order_updates_time_and_fields(db_session, engine):

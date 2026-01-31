@@ -19,7 +19,6 @@ from services.order_services import (
     get_order_detail,
     mark_order_paid,
     order_to_dict,
-    order_to_json,
     suggest_time_slots_text,
 )
 from services.order_types import (
