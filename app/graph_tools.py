@@ -189,17 +189,18 @@ def suggest_time_slots_tool(
 
 @tool
 def rag_rules_tool(*, question: str) -> dict[str, Any]:
-    """基于本地规则文件回答客户的规则/流程/计费/押金等问题。如果返回了正在初始化，则直接回复让客户稍后再试。"""
+    """Use RAG to answer question. If RAG is not ready or not hit, return direct message from this tool."""
     if not rules_rag.ready:
         return {"result": "规则库正在初始化，请稍后再试。"}
     snippets = rules_rag.query(question)
     if not snippets:
         error = rules_rag.error
         if error:
-            return {"result": f"规则库未就绪：{error}"}
+            return {"result": f"规则库未就绪，请联系管理员。错误代码：{error}"}
         return {"result": "规则库未命中相关条目。"}
-    ctx = "\n".join(f"- {s}" for s in snippets)
-    return {"result": f"在文件中查到的相关规则如下：\n{ctx}\n\n"}
+    # ctx = "\n".join(f"- {s}" for s in snippets)
+    # return {"result": f"在文件中查到的相关规则如下：\n{ctx}\n\n"}
+    return {"result": snippets}
 
 
 TOOLS = [
