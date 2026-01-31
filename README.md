@@ -1,7 +1,17 @@
 # Rental Agent (LangGraph + RAG)
+<!-- 构建 / CI 状态 -->
+![Build Status](https://img.shields.io/github/actions/workflow/status/William-AIdev/Agentic-RentingSystem/ci.yml?branch=main&style=flat-square)
+<!-- Tech Stacks -->
+![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&style=flat-square)
+![LangChain](https://img.shields.io/badge/LangChain-RAG_Framework-0FA958?style=flat-square)
+![OpenAI](https://img.shields.io/badge/OpenAI-LLM-412991?logo=openai&style=flat-square)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-DB-336791?logo=postgresql&style=flat-square)
+![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-ORM-red?style=flat-square)
+![Docker](https://img.shields.io/badge/Docker-Container-2496ED?logo=docker&style=flat-square)
+
+
 
 A production-minded rental-agent, based on real personal rental business.
-
 User can interact with the agent to speed up rental order processing, 
 including creating, querying, updating, canceling, paying, shipping, and completing orders. 
 
