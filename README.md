@@ -1,6 +1,7 @@
 # Rental Agent (LangGraph + RAG)
 <!-- 构建 / CI 状态 -->
-![Build Status](https://img.shields.io/github/actions/workflow/status/William-AIdev/Agentic-RentingSystem/ci.yml?branch=main&style=flat-square)
+![Build Status](https://img.shields.io/github/actions/workflow/status/William-AIdev/Agentic-RentingSystem/tests.yml?branch=main&style=flat-square)
+
 <!-- Tech Stacks -->
 ![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&style=flat-square)
 ![LangChain](https://img.shields.io/badge/LangChain-RAG_Framework-0FA958?style=flat-square)
