@@ -9,16 +9,16 @@ The agent can also answer questions about rental rules using Retrieval-Augmented
 
 Tech Stack:
 - Frontend: [Gradio](https://gradio.ai/)
-- Agent framework: [LangGraph](https://langgraph.com/)
+- Agent framework: [LangGraph + LangSmith](https://langgraph.com/)
 - Vector store: [Qdrant](https://qdrant.io/)
 - Database: [PostgreSQL](https://www.postgresql.org/)
 - LLM: [OpenAI GPT-5 Nano](https://openai.com/)
 
 ## Features
 
-- Full order flow: create / query / update / cancel / pay / ship / complete
+- Full order flow: create / query / update / cancel / pay / ship / complete / suggest time slots
 - Rules Q&A: retrieval over local rules file
-- Time suggestions: recommend available rental slots based on inventory occupancy
+- Agent tracking: use LangSmith to track agent and fine-tune the workflow and token cost
 - One-command Docker startup: Postgres + Qdrant + App
 - Unit tests, auto-lint bash script and GitHub Actions CI are included.
 - Can be easily deployed to cloud (e.g., AWS, Supabase, Qdrant Cloud)
@@ -149,6 +149,14 @@ All configuration is in `.env`. Key variables:
   ```bash
   ruff check .
   ```
+## LangSmith (Optional)
+
+Set the LangSmith key in .env to enable agent tracking, or deploy it locally (not included).
+
+You could see the workflow and token cost through the panel:
+
+<img width="1407" height="1226" alt="image" src="https://github.com/user-attachments/assets/0d61b769-f836-4c74-840e-99d40ddcb737" />
+
 
 ## FAQ
 
