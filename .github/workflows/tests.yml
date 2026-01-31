@@ -20,11 +20,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
 
-      - name: Run Order Services Tests with Postgres
+      - name: Run Tests (Testcontainers)
         env:
           TESTCONTAINERS_RYUK_DISABLED: "true"
         run: |
-          pytest tests/test_order_services.py
+          pytest tests
 
       - name: Lint
         continue-on-error: true

@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from services import db as services_db
 from services.db import get_engine
 
 
@@ -33,6 +34,9 @@ def _init_db(postgres_container):
     from sqlalchemy.engine.url import make_url
 
     os.environ["DATABASE_URL"] = postgres_container.get_connection_url()
+    # Reset cached engine/session factory in case they were created before DATABASE_URL was set.
+    services_db._ENGINE = None
+    services_db._SESSION_FACTORY = None
 
     # Ensure schema is initialized once per test session using psql inside container.
     base_dir = Path(__file__).resolve().parents[1]
@@ -79,3 +83,12 @@ def db_session(engine):
         session.close()
         with engine.begin() as conn:
             conn.exec_driver_sql("TRUNCATE orders RESTART IDENTITY CASCADE")
+
+
+@pytest.fixture(autouse=True)
+def _clean_orders(request):
+    if "engine" not in request.fixturenames and "db_session" not in request.fixturenames:
+        return
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.exec_driver_sql("TRUNCATE orders RESTART IDENTITY CASCADE")
