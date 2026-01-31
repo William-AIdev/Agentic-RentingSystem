@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 from contextlib import nullcontext
+import json
 from datetime import UTC, datetime, timedelta, tzinfo
 from typing import Any
 

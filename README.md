@@ -1,12 +1,12 @@
 # Rental Agent (Gradio + LangGraph)
 
-面向衣物租赁场景的本地 Web 应用，支持订单管理、规则问答（RAG）、时间档期建议与可视化对话。
+本项目是面向衣物租赁场景的本地 Web 应用，支持订单管理、规则问答（RAG）、可租时间段建议与可视化对话。
 
 ## 功能概览
 
 - 订单全流程：创建/查询/更新/取消/支付/发货/完成
 - 规则问答：基于本地规则文件检索回答
-- 时间建议：基于库存占用推荐可租时间段
+- 时间建议：根据库存占用推荐可租时间段
 - 可配置时区：默认 Australia/Sydney
 - Docker 一键启动：Postgres + Qdrant + App
 
@@ -22,7 +22,7 @@
    ```bash
    docker compose up --build
    ```
-   （因为需要下载近4GB的模型与依赖，第一次构建可能需要几分钟，取决于网络速度）
+   （需要下载约 4GB 的模型与依赖，首次构建可能耗时较长，取决于网络速度）
    如果是开发环境：
    ```bash
    docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
@@ -41,7 +41,7 @@
    - 怎么租衣服
    - 怎么还衣服
 
-2. 创建订单（本地时区默认 Sydney,sku代表商品颜色和型号，命名格式为[BLACK, WHITE]_[S,M,L]）
+2. 创建订单（本地时区默认 Sydney，SKU 代表商品颜色与尺码，格式为 [BLACK, WHITE]_[S,M,L]）
    ```
    创建订单，用户张三，微信 zhangsan，SKU black_l，开始 2026-01-29 08:00，结束 2026-01-30 20:00
    ```
@@ -58,7 +58,7 @@
 
 5. 发货（需要 locker_code）
    ```
-   发货，订单号为 <order_id>，取件码 LC123(可使用其他)
+   发货，订单号为 <order_id>，取件码 LC123（可使用其他）
    ```
 
 6. 完成订单
@@ -100,7 +100,7 @@
   ```bash
   mypy --explicit-package-bases .
   ```
-  - Ruff：
+- Ruff：
   ```bash
   ruff check .
   ```
