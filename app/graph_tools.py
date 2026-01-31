@@ -82,7 +82,8 @@ def create_order_tool(
     start_at: str,
     end_at: str,
 ) -> dict[str, Any]:
-    """Create an order. SKU means clothes colour/size code, for example: white_s"""
+    """Create an order. SKU means clothes colour/size code, for example: white_s.
+    If the SKU is already booked in the selected time range, use suggest_time_slots_tool to find available time slots."""
     try:
         order = add_order_to_db(
             order_id=f"{uuid.uuid4().hex[:8]}",

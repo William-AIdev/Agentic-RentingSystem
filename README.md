@@ -1,14 +1,28 @@
 # Rental Agent (Gradio + LangGraph)
 
-A local web app for a clothing rental scenario. It supports order management, rules Q&A (RAG), time-slot suggestions, and a visual chat interface.
+A production-minded rental-agent, based on real personal rental business.
+
+User can interact with the agent to speed up rental order processing, 
+including creating, querying, updating, canceling, paying, shipping, and completing orders. 
+
+The agent can also answer questions about rental rules using Retrieval-Augmented Generation (RAG) over documents.
+
+Tech Stack:
+- Frontend: [Gradio](https://gradio.ai/)
+- Agent framework: [LangGraph](https://langgraph.com/)
+- Vector store: [Qdrant](https://qdrant.io/)
+- Database: [PostgreSQL](https://www.postgresql.org/)
+- LLM: [OpenAI GPT-5 Nano](https://openai.com/)
 
 ## Features
 
 - Full order flow: create / query / update / cancel / pay / ship / complete
 - Rules Q&A: retrieval over local rules file
 - Time suggestions: recommend available rental slots based on inventory occupancy
-- Configurable timezone: default `Australia/Sydney`
 - One-command Docker startup: Postgres + Qdrant + App
+- Unit tests, auto-lint bash script and GitHub Actions CI are included.
+- Can be easily deployed to cloud (e.g., AWS, Supabase, Qdrant Cloud)
+- Future: Personalized frontend with ReactJS, multi-user support, email notifications
 
 ## Quick Start (Docker)
 
@@ -69,10 +83,34 @@ A local web app for a clothing rental scenario. It supports order management, ru
    Complete order <order_id>
    ```
 
-7. Cancel order (optional)
+7. Try a conflicting Order
+
+   Enter a order that overlaps with an existing order's time
+   ```
+   Create order, user Alice, wechat alicechat, SKU black_l, start 2026-01-29 10:00, end 2026-01-30 18:00
+   ```
+   Then the agent will suggest alternative available time slots.
+   ```
+   The requested SKU black_l is already booked for 2026-01-29 10:00 to 2026-01-30 18:00.
+
+   Next available window for black_l is:
+
+   ...
+   ```
+   Then you can choose another time slot to order. 
+   
+   You don't need to specify other details again if in the same chat session.
+
+8. Cancel order (optional)
    ```
    Cancel order <order_id>
    ```
+
+9. Update order (optional)
+   ```
+   I want to update order <order_id>, the new end time is 2026-01-31 20:00
+   ```
+
 
 ## Project Structure
 
@@ -97,6 +135,7 @@ All configuration is in `.env`. Key variables:
 - `RULES_PATH`: rules file path
 
 ## Dev Tools (Optional)
+
 
 - Black:
   ```bash
