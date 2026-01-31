@@ -1,4 +1,4 @@
-# Rental Agent (Gradio + LangGraph)
+# Rental Agent (LangGraph + RAG)
 
 A production-minded rental-agent, based on real personal rental business.
 
