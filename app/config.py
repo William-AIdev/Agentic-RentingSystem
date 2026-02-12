@@ -23,6 +23,9 @@ class Settings:
     # LLM configuration.
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5-nano")
     openai_temperature: float = float(os.getenv("OPENAI_TEMPERATURE", "0"))
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+    model_base_url: str | None = os.getenv("CUSTOM_MODEL_BASE_URL", None)
+    model_provider: str = os.getenv("MODEL_PROVIDER", "openai")
 
     # RAG rules + vector store configuration.
     rules_path: str = os.getenv("RULES_PATH", "agent/rules/rental_rules.md")
