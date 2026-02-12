@@ -15,6 +15,8 @@ A production-minded rental-agent, based on real personal rental business.
 User can interact with the agent to speed up rental order processing, 
 including creating, querying, updating, canceling, paying, shipping, and completing orders. 
 
+Support self-deployed OpenAI-Compatible model.
+
 The agent can also answer questions about rental rules using Retrieval-Augmented Generation (RAG) over documents.
 
 Tech Stack:
@@ -22,7 +24,7 @@ Tech Stack:
 - Agent framework: [LangGraph + LangSmith](https://langgraph.com/)
 - Vector store: [Qdrant](https://qdrant.io/)
 - Database: [PostgreSQL](https://www.postgresql.org/)
-- LLM: [OpenAI GPT-5 Nano](https://openai.com/)
+- LLM: [OpenAI GPT-5 Nano](https://openai.com/)  or self-deployed model
 
 ## Features
 
