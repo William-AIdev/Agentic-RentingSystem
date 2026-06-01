@@ -1,0 +1,4 @@
+# Optional reranker dependency.
+# Install this only when ENABLE_RERANKER=true.
+-r requirements.txt
+FlagEmbedding>=1.2.11
