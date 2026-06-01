@@ -17,7 +17,9 @@ including creating, querying, updating, canceling, paying, shipping, and complet
 
 Support self-deployed OpenAI-Compatible model.
 
-The agent can also answer questions about rental rules using Retrieval-Augmented Generation (RAG) over documents.
+The agent can also answer questions about rental rules using Retrieval-Augmented Generation
+(RAG) over documents, with hybrid BM25 + dense retrieval, RRF fusion, and an optional
+reranker.
 
 Tech Stack:
 - Frontend: [Gradio](https://gradio.ai/)
@@ -29,7 +31,9 @@ Tech Stack:
 ## Features
 
 - Full order flow: create / query / update / cancel / pay / ship / complete / suggest time slots
-- Rules Q&A: retrieval over local rules file
+- Rules Q&A: hybrid BM25 + dense retrieval over local rules file, fused with RRF
+- Optional reranker: install `requirements-reranker.txt` and enable
+  `BAAI/bge-reranker-v2-m3` for final candidate reranking
 - Agent tracking: use LangSmith to track agent and fine-tune the workflow and token cost
 - One-command Docker startup: Postgres + Qdrant + App
 - Unit tests, auto-lint bash script and GitHub Actions CI are included.
@@ -145,6 +149,18 @@ All configuration is in `.env`. Key variables:
 - `LOCAL_TIMEZONE`: user input/output timezone (default `Australia/Sydney`)
 - `QDRANT_URL`: vector store URL
 - `RULES_PATH`: rules file path
+- `RAG_DENSE_K`: dense retrieval candidates from Qdrant
+- `RAG_BM25_K`: keyword retrieval candidates from BM25
+- `RAG_RERANK_CANDIDATES`: fused candidates sent to reranker or final truncation
+- `ENABLE_RERANKER`: set to `true` to enable reranker; keep `false` for lightweight CPU demos
+- `RERANKER_MODEL`: reranker model name, default `BAAI/bge-reranker-v2-m3`
+
+Reranker support is optional to keep the default Docker image lightweight. To enable it,
+install the extra dependencies first:
+
+```bash
+pip install -r requirements-reranker.txt
+```
 
 ## Dev Tools (Optional)
 
